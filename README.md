@@ -8,6 +8,15 @@ FlowyBlog Framework 是一个使用 Next.js、TypeScript、Tailwind CSS 和 MDX 
 框架剥离自一个实际运行的博客：布局、样式、组件、实验室、评论后台都是
 验证过的可用状态，站点信息和文章已清空为占位符，改配置即可变成自己的站。
 
+## 在线预览
+
+本项目当前部署为无后端的静态 GitHub Pages：
+
+<https://lll114514lll1919810lll.github.io/flowyblog-framework/>
+
+GitHub Pages 构建会关闭依赖 Cloudflare Functions 的评论区，文章、搜索、
+主题和实验室等静态功能仍然可用。
+
 ## 功能一览
 
 - **内容**：MDX 文章，自动生成列表、标签、按月归档、分页、RSS 式 sitemap
@@ -160,6 +169,13 @@ NEXT_OUTPUT=export pnpm build
 `next/image` 优化器会被关闭，改图片相关代码后务必跑一次导出构建验证。
 仓库中的 CI 会依次执行依赖安装、类型生成、类型检查、lint、静态导出和
 产物断言，本地拿不准时以 CI 为准。
+
+### GitHub Pages
+
+仓库已配置 `.github/workflows/pages.yml`，推送到 `main` 后会自动构建并发布
+到 GitHub Pages。项目站点使用仓库路径 `/flowyblog-framework`，因此部署到
+自己的项目仓库时，需要同步修改 `next.config.ts` 中的 `basePath`、工作流里的
+`NEXT_PUBLIC_BASE_PATH`，以及 `src/lib/site.ts` 中的站点地址。
 
 ### 评论与后台
 
