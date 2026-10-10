@@ -8,12 +8,12 @@ export const siteConfig = {
   description: "记录技术、思考与生活。",
   // 正式域名。部署后改成自己的域名，sitemap 等会用到；
   // Cloudflare Pages 每次推送都会重新构建，改这里之后要 push 才生效。
-  url: "https://example.com",
-  github: "https://github.com/your-name",
+  url: "https://lll114514lll1919810lll.github.io/flowyblog-framework",
+  github: "https://github.com/lll114514lll1919810lll",
   // 博客源码仓库。页脚「源码」链接（AGPL 要求向使用者提供完整源码，
   // 指向仓库才算履行）和关于页都指向这里，所以单独存一份，不和 github
   // 混用——那个是作者主页，不是源码地址。部署时改成自己的仓库地址。
-  repo: "https://github.com/your-name/your-blog",
+  repo: "https://github.com/lll114514lll1919810lll/flowyblog-framework",
 } as const;
 
 /**
@@ -44,7 +44,7 @@ export const LICENSE = {
   // AGPL 第 13 条要求向网络使用者「提供完整源码」，指向仓库才算履行，
   // 只链一份协议全文不算。
   code: "AGPL-3.0",
-  codeUrl: "https://github.com/your-name/your-blog",
+  codeUrl: "https://github.com/lll114514lll1919810lll/flowyblog-framework",
   // 文章内容的授权由站主自行决定，框架不替你选。留空（默认）表示
   // 暂不声明，页脚和关于页会隐藏内容授权条目；想声明时两行都填上，
   // 例如：

@@ -40,10 +40,19 @@ const withMDX = createMDX({
  * 静态导出后产物里没有 Node 服务器，`pnpm start` 会直接失效。
  */
 const isStaticExport = process.env.NEXT_OUTPUT === "export";
+const isGitHubPages = process.env.GITHUB_PAGES === "true";
+const githubPagesBasePath = isGitHubPages ? "/flowyblog-framework" : "";
 
 const nextConfig: NextConfig = {
   // 让 .md / .mdx 文件可以被 Next.js 当作路由或模块处理
   pageExtensions: ["ts", "tsx", "md", "mdx"],
+
+  ...(isGitHubPages
+    ? {
+        basePath: githubPagesBasePath,
+        assetPrefix: `${githubPagesBasePath}/`,
+      }
+    : {}),
 
   ...(isStaticExport
     ? {

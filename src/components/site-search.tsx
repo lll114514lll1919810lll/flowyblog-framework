@@ -18,10 +18,14 @@ import type { SearchDoc, SearchIndex, SearchSection } from "@/lib/search-index";
 
 let cached: SearchIndex | null = null;
 let inflight: Promise<SearchIndex> | null = null;
+const searchIndexPath =
+  process.env.NEXT_PUBLIC_BASE_PATH
+    ? `${process.env.NEXT_PUBLIC_BASE_PATH}/search-index.json`
+    : "/search-index.json";
 
 function loadIndex(): Promise<SearchIndex> {
   if (cached) return Promise.resolve(cached);
-  inflight ??= fetch("/search-index.json")
+  inflight ??= fetch(searchIndexPath)
     .then((res) => (res.ok ? res.json() : Promise.reject(new Error("索引加载失败"))))
     .then((data: SearchIndex) => {
       cached = data;

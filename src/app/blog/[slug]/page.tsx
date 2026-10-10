@@ -7,6 +7,8 @@ import { PostNavigation } from "@/components/post-navigation";
 import { getAllPosts, getPostBySlug, getTableOfContents } from "@/lib/posts";
 import { formatDate } from "@/lib/date";
 
+const isGitHubPages = process.env.GITHUB_PAGES === "true";
+
 /**
  * 预渲染所有文章页。
  *
@@ -117,7 +119,7 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
           {/* 评论是本页唯一的动态内容：页面本身仍是静态预渲染的 HTML，
               评论在浏览器里向 /api/comments 取（见 functions/api/comments.js）。
               用 slug 作为 page 标识，后端按它分区存储。 */}
-          <Comments page={slug} />
+          {!isGitHubPages && <Comments page={slug} />}
         </>
       }
     >
