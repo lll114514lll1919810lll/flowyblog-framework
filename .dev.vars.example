@@ -1,0 +1,14 @@
+# 复制本文件为 .dev.vars（不要提交到仓库），填入自己的值。
+# 键名必须与 functions/ 里的 env.* 引用一致，不能改。
+
+# 管理后台登录密钥
+ADMIN_KEY=your-admin-key
+
+# 评论会话签名密钥，随便一串足够长的随机字符
+SESSION_SECRET=your-session-secret
+
+# 评论者 IP 哈希的盐
+IP_SALT=your-ip-salt
+
+# 允许调用评论接口的来源（逗号分隔），本地开发示例
+ALLOWED_ORIGINS=http://localhost:3000

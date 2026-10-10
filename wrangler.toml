@@ -1,0 +1,22 @@
+# Cloudflare Pages 项目配置。
+#
+# D1 绑定指向评论数据库。绑定名必须是 DB——functions/ 里用的就是 env.DB。
+#
+# 本地开发也读这份配置（wrangler pages dev 与 wrangler d1 execute 都靠它），
+# 所以本地调试不需要额外加参数。
+
+name = "flowyblog-framework"
+
+# 静态产物目录。必须与 Cloudflare 后台「构建输出目录」一致（都是 out）。
+pages_build_output_dir = "out"
+
+compatibility_date = "2026-01-01"
+
+# 部署前先创建自己的 D1 数据库并把信息填进来：
+#   npx wrangler d1 create fblog-comments
+#   npx wrangler d1 execute fblog-comments --remote --file=db/schema.sql
+# database_id 换成创建命令返回的真实 ID。
+[[d1_databases]]
+binding = "DB"
+database_name = "fblog-comments"
+database_id = "00000000-0000-0000-0000-000000000000"

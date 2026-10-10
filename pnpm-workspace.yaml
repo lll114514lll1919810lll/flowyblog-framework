@@ -1,0 +1,23 @@
+# pnpm 构建脚本白名单。
+#
+# pnpm 10 起默认不执行依赖的安装脚本，必须在这里显式声明每个包的处置。
+# 未声明的包在 CI 上会被当作「拒绝执行」，让 `pnpm install` 直接以
+# ERR_PNPM_IGNORED_BUILDS 失败——本地因为 node_modules 已存在所以看不出来，
+# 一到 Cloudflare 构建就炸。这个文件因此必须写成明确的布尔值，
+# 不能留「set this to true or false」这种占位字符串。
+#
+# 这里只放行「运行期或构建期真正需要」的包，其余一律 false 跳过安装脚本。
+allowBuilds:
+  # sharp：Next.js 的 next/image 用它处理图片。本项目没有用 next/image
+  #（文章配图是裸 <img>），所以关掉不影响任何功能，还能省下安装时间。
+  sharp: false
+
+  # unrs-resolver：eslint-config-next 用来解析 import 路径，
+  # 有 JS 回退实现，关掉后 lint 仍能正常工作。
+  unrs-resolver: false
+
+  # esbuild：来自 devDependency tsx（只有 pnpm test 用它跑 TS 脚本），
+  # next build 走的是 Turbopack，不依赖 esbuild。
+  # 因此 Cloudflare 构建不需要它，关掉即可。
+  # 若日后在 CI 里改用 esbuild 打包，再改回 true。
+  esbuild: false
