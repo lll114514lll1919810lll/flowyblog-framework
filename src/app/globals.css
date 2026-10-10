@@ -104,7 +104,7 @@
   --radius-panel: 14px;
 
   /* 浅色和深色主题使用独立背景资源，便于后续分别替换 */
-  --bg-image: url("/background-light.png");
+  --bg-image: var(--bg-image-light);
   /* 背景薄纱：亮色图是中间调（中位亮度 0.427），深色文字直接压上去会糊，
      盖一层 50% 白把图压成纹理，文字才稳。与图同为 fixed，一起滚动。
      深色主题不需要（那边图本身够暗，实测文字对比度已达标）。 */
@@ -162,7 +162,7 @@
     --panel-border: rgb(255 255 255 / 0.09);
     --panel-highlight: rgb(255 255 255 / 0.06);
     --panel-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -14px rgb(0 0 0 / 0.5);
-    --bg-image: url("/background-dark.png");
+    --bg-image: var(--bg-image-dark);
   --bg-scrim: none;
     --bg-scrim: none;
     /* 背景图一开，没有底色的文字就必须描边：图里任何位置都可能是亮的，
@@ -211,7 +211,7 @@
   --panel-border: rgb(255 255 255 / 0.09);
   --panel-highlight: rgb(255 255 255 / 0.06);
   --panel-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -14px rgb(0 0 0 / 0.5);
-  --bg-image: url("/background-dark.png");
+  --bg-image: var(--bg-image-dark);
   --bg-scrim: none;
   /* 与上面媒体查询块里那份逐字一致，改一处必须改两处 */
   --text-outline:
@@ -2675,7 +2675,7 @@ html {
   --panel-highlight: rgb(34 211 238 / 0.06);
   --panel-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -14px rgb(0 0 0 / 0.5);
   /* 专用壁纸：霓虹隧道（青 + 品红，75% 以上近黑），不与默认深色主题共用 */
-  --bg-image: url("/background-cyberpunk.png");
+  --bg-image: var(--bg-image-cyberpunk);
   --bg-scrim: none;
   --text-outline:
     0.5px 0 rgb(0 0 0 / 0.5), -0.5px 0 rgb(0 0 0 / 0.5),

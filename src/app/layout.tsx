@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { ReadingProgress } from "@/components/reading-progress";
 import { PageTransition } from "@/components/page-transition";
@@ -16,6 +17,13 @@ export const metadata: Metadata = {
   description: siteConfig.description,
 };
 
+const assetBasePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+const backgroundStyle = {
+  "--bg-image-light": `url("${assetBasePath}/background-light.png")`,
+  "--bg-image-dark": `url("${assetBasePath}/background-dark.png")`,
+  "--bg-image-cyberpunk": `url("${assetBasePath}/background-cyberpunk.png")`,
+} as CSSProperties;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     // lang 告诉浏览器和搜索引擎这是简体中文站点
@@ -24,7 +32,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     // （早于水合、早于首次绘制）就往 <html> 写 data-theme 和 color-scheme，
     // 这两个属性 JSX 里没有，React 水合时会当成属性不一致。
     // 这里明确告诉 React：这个元素上的差异是预期内的，以 DOM 为准。
-    <html lang="zh-CN" className="h-full antialiased" suppressHydrationWarning>
+    <html
+      lang="zh-CN"
+      className="h-full antialiased"
+      style={backgroundStyle}
+      suppressHydrationWarning
+    >
       <head>
         {/* 必须在 <head> 里同步执行：脚本跑完才开始渲染 body，
             深色用户不会先看到一帧白底。见 lib/theme.ts 的说明。 */}
