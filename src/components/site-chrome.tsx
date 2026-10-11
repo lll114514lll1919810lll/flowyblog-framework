@@ -83,7 +83,17 @@ export function SiteFooter() {
           <p>
             © {new Date().getFullYear()} {siteConfig.author}
           </p>
-          <p>Powered by FlowyBlog Framework</p>
+          <p>
+            Powered by{" "}
+            <a
+              href="https://github.com/lll114514lll1919810lll/flowyblog-framework"
+              target="_blank"
+              rel="noreferrer"
+              className="transition-colors hover:text-foreground"
+            >
+              FlowyBlog Framework
+            </a>
+          </p>
         </div>
 
         {/* 授权声明放在页脚而不是关于页：转载的人通常只翻到这个站最底部，
