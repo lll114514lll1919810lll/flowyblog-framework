@@ -7,9 +7,17 @@ import type { NextConfig } from "next";
 // （写成 `remarkGfm` 这样的函数引用会导致构建报错。）
 const withMDX = createMDX({
   options: {
-    remarkPlugins: ["remark-gfm"],
+    remarkPlugins: [
+      "remark-gfm",
+      // 解析 $...$（行内）和 $$...$$（块级）LaTeX 语法，
+      // 生成带 math 类的 AST 节点，交给 rehype-katex 渲染。
+      "remark-math",
+    ],
     rehypePlugins: [
       "rehype-slug",
+      // KaTeX 把上面的 math 节点在构建时渲染成静态 HTML，
+      // 纯静态导出可用，不需要浏览器端跑任何公式库。
+      "rehype-katex",
       [
         // Shiki 高亮。插件配置只能通过字符串名传，
         // options 要写成 [name, options] 的元组形式。

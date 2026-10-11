@@ -153,7 +153,11 @@ export default function AboutPage() {
                 （代码高亮，底层是{" "}
                 <a href="https://shiki.style" target="_blank" rel="noreferrer">Shiki</a>
                 ）、
-                <a href="https://github.com/Flet/github-slugger" target="_blank" rel="noreferrer">github-slugger</a>
+                <a href="https://github.com/Flet/github-slugger" target="_blank" rel="noreferrer">github-slugger</a>、
+                <a href="https://github.com/remarkjs/remark-math" target="_blank" rel="noreferrer">remark-math</a>、
+                <a href="https://github.com/remarkjs/remark-math/tree/main/packages/rehype-katex" target="_blank" rel="noreferrer">rehype-katex</a>、
+                <a href="https://katex.org" target="_blank" rel="noreferrer">KaTeX</a>
+                （LaTeX 公式渲染）
               </li>
               <li>
                 <strong>液态玻璃</strong>：渲染器和 shader 原样取自{" "}

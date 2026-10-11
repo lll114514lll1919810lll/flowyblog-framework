@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+// KaTeX 公式渲染样式（构建时已把公式转成静态 HTML，浏览器只需要这份 CSS）。
+import "katex/dist/katex.min.css";
 import { Comments } from "@/components/comments";
 import { PostBody } from "@/components/post-body";
 import { PostNavigation } from "@/components/post-navigation";
