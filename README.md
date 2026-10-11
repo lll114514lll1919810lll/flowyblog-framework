@@ -72,9 +72,9 @@ export const siteConfig = {
 
 ### 顶部站点标识
 
-顶栏左上角是纯 CSS 渲染的「圆形底 + 站名首字」，自动取 `siteConfig.name` 的第一个字符，不依赖任何图片。想换成自己的 logo，把 `src/components/site-logo.tsx` 里的 `<span>` 换成图片即可（圆形裁切由 `globals.css` 里的 `.site-logo-badge` 负责）。
+顶栏左上角默认是纯 CSS 渲染的「圆形底 + 站名首字」，自动取 `siteConfig.name` 的第一个字符，不依赖任何图片。想换成图片 logo，在 `src/lib/site.ts` 的 `siteConfig.logo` 填 public 下的图片路径（如 `"/site-logo.jpg"`）即可，圆形裁切由 `globals.css` 里的 `.site-logo-badge` 负责。
 
-不要用 `next/image` 引用顶栏 logo：静态导出后 `/_next/image` 优化路由不存在，图片会静默 404。普通 `<img>` 或已开启 `unoptimized` 的导出构建没有这个问题。
+图片 logo 走 `next/image` 是安全的：导出构建会关闭优化器（`images.unoptimized`），图片直接输出原图路径。会静默 404 的是依赖 `/_next/image` 优化接口的写法——静态产物里不存在那个路由。改图片相关代码后务必跑一次导出构建验证。
 
 ## 写文章
 

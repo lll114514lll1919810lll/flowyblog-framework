@@ -824,9 +824,9 @@
   /* ==========================================================================
      站点标识（顶栏左上角）
 
-     32px 圆形底 + 站名首字，纯 CSS 渲染，不依赖图片资源（见
-     components/site-logo.tsx 的说明）。想换成正式 logo 图片时，
-     圆形裁切由这里负责。
+     两种形态共用这个类（见 components/site-logo.tsx）：默认是 32px
+     圆形底 + 站名首字的纯 CSS 形态；siteConfig.logo 填了图片路径时
+     同一个类落在 <img> 上，靠 object-fit: cover 做圆形裁切。
 
      配色和明暗切换开关的滑块同一套逻辑：底色用 --foreground、字用
      --background，两套主题下都是最高对比，且不引入新颜色。
@@ -840,6 +840,8 @@
     width: 2rem; /* 32px */
     height: 2rem;
     border-radius: 999px;
+    /* 图片形态：撑满并按圆形裁切。对文字形态无影响 */
+    object-fit: cover;
     background: var(--foreground);
     color: var(--background);
     font-size: 1rem;

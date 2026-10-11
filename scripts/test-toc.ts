@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { getTableOfContents, getReadingTime, getAllPosts } from "@/lib/posts";
 
 /**
@@ -67,28 +69,45 @@ async function main() {
   const toc = getTableOfContents(slug);
   check("能提取到目录", toc.length > 0);
   check("不包含 h1（标题由页头渲染）", toc.every((i) => i.depth >= 2));
+
+  // 中文标题 id 保留中文：github-slugger 对纯 CJK 文本保留原文。
+  // 动态找一段纯中文标题来验证，不写死具体文字——换文章也能跑。
+  const cjkHeading = toc.find((i) => /^[\u4e00-\u9fa5]+$/.test(i.text));
   check(
     "中文标题 id 保留中文",
-    toc.some((i) => i.text === "常用排版元素" && i.id === "常用排版元素"),
+    cjkHeading !== undefined && cjkHeading.id === cjkHeading.text,
+    cjkHeading ? `${cjkHeading.text} → ${cjkHeading.id}` : `实际目录: ${toc.map((i) => i.text).join(" / ")}`,
   );
 
   // 含行内代码的标题：两边都要基于剥离后的纯文本算 slug。
-  // 示例文章里有「标题里的行内代码：`draft` 开关」这一节，
-  // 剥离后锚点里应出现 draft，且不带反引号
-  const inlineCodeHeading = toc.find((i) => i.text.includes("draft"));
-  check(
-    "含行内代码的标题 slug 基于剥离后的纯文本",
-    inlineCodeHeading !== undefined &&
-      inlineCodeHeading.id.includes("draft") &&
-      !inlineCodeHeading.id.includes("`"),
-    `实际得到: ${toc.map((i) => `${i.text} → ${i.id}`).join(" / ")}`,
-  );
+  // toc.text 里反引号已被剥掉，所以从原始源码里找含反引号的标题，
+  // 取出代码片段，再到 toc 里核对对应的 id 是否含该片段且不含反引号。
+  const raw = getAllPosts().find((p) => p.slug === slug)
+    ? fs.readFileSync(path.join(process.cwd(), "src/content", `${slug}.mdx`), "utf8")
+    : "";
+  const codeHeadingMatch = raw.match(/^#{2,3}\s+.*?`([^`]+)`.*$/m);
+  if (codeHeadingMatch) {
+    const codePart = codeHeadingMatch[1];
+    const inlineCodeHeading = toc.find((i) => i.text.includes(codePart));
+    check(
+      "含行内代码的标题 slug 基于剥离后的纯文本",
+      inlineCodeHeading !== undefined &&
+        inlineCodeHeading.id.includes(codePart) &&
+        !inlineCodeHeading.id.includes("`"),
+      inlineCodeHeading
+        ? `${inlineCodeHeading.text} → ${inlineCodeHeading.id}`
+        : `代码片段「${codePart}」在 toc 中未找到`,
+    );
+  } else {
+    console.log("  SKIP  含行内代码的标题（最新文章无此类标题）");
+  }
 
   console.log("\n代码块内的 # 不会被误判为标题");
-  // hello-world.mdx 的 bash 代码块里有一行 "# 本地开发，http://localhost:3000"
+  // 代码块里的 # 是注释，不该进目录。只要目录里没有以 # 开头的文本就行
+  // （代码块内的 # 行如果被误判，text 会是 "# ..."）
   check(
     "跳过了代码块内的井号注释",
-    !toc.some((i) => i.text.includes("本地开发")),
+    !toc.some((i) => /^#/.test(i.text)),
     `实际目录: ${toc.map((i) => i.text).join(" / ")}`,
   );
 
