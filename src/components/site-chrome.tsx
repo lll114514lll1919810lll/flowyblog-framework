@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { CONTENT_MAX_WIDTH, LICENSE, navLinks, siteConfig } from "@/lib/site";
+import { CONTENT_MAX_WIDTH, LICENSE, siteConfig } from "@/lib/site";
 import { AdminEntry } from "@/components/admin-entry";
 import { LinkPending } from "@/components/link-pending";
+import { MobileNav } from "@/components/mobile-nav";
 import { SiteLogo } from "@/components/site-logo";
+import { SiteNav } from "@/components/site-nav";
 import { SiteSearch } from "@/components/site-search";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -18,46 +20,45 @@ import { ThemeToggle } from "@/components/theme-toggle";
  */
 const BAR = "panel rounded-none border-x-0";
 
+/**
+ * 顶栏。控件布局参考 XinBlog 的顶栏设计：
+ *   左「站标 + 常驻的内联搜索框」，右「导航 + 主题开关」。
+ *
+ * 宽屏（≥ md）把导航排成一组带滑动高亮的胶囊（SiteNav）；放不下时
+ * 收进汉堡菜单（MobileNav），保持顶栏不被挤溢出。搜索在窄屏会跟着收缩，
+ * 但始终留在原地——它不是一个「先点图标再弹窗」的入口。
+ */
 export function SiteHeader() {
   return (
     // 直角通栏，贴住屏幕上沿
     <header className={`${BAR} sticky top-0 z-50 w-full border-t-0`}>
+      {/* 顶栏高度用 --header-h 统一：搜索浮层、汉堡菜单面板都要靠它
+          算「顶栏下沿」的位置，写死两处迟早对不上 */}
       <div
-        className="mx-auto flex h-14 items-center justify-between px-6"
+        className="mx-auto flex h-[var(--header-h)] items-center gap-2 px-4 sm:gap-3 sm:px-6"
         style={{ maxWidth: CONTENT_MAX_WIDTH }}
       >
-        {/* 站点标识：占位圆形图标，见 site-logo.tsx。
-            原来是站名文字，换成图标后顶栏左侧只占 44px，
-            窄屏上让出了大量空间（320px 下品牌与首个链接的间距
-            从 2.8px 变成 90px 以上） */}
+        {/* 站点标识：占位圆形图标，见 site-logo.tsx */}
         <SiteLogo />
 
-        {/* 开关放在 nav 外面：它是站点控件，不是导航链接，
-            混进去会让读屏在「导航」这一块里念到它 */}
-        {/* gap 给导航和开关之间留出分组间距。链接之间是 12px（sm:gap-3），
-            这里 12/16px 略大一点，让开关看起来是另一组东西；
-            移动端只能给到 12px，再宽会在 375px 上把顶栏挤溢出 */}
-        <div className="flex items-center gap-3 sm:gap-4">
-          {/* gap-3 对所有尺寸生效。原来是 sm:gap-3，移动端四个链接挤成
-              「首页文章标签关于」连在一起。站名换成 44px 图标后，窄屏
-              腾出了位置：320px 下加完 3 个 12px 间距还剩 32px 余量 */}
-          <nav className="-my-2 flex items-center text-[13px] gap-3">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="flex items-center py-3 text-secondary transition-colors hover:text-foreground sm:py-2"
-              >
-                <LinkPending>{link.label}</LinkPending>
-              </Link>
-            ))}
-          </nav>
+        {/* 常驻的内联搜索框，占据站标与右侧控件之间的弹性空间 */}
+        <SiteSearch />
 
-          {/* 搜索放在开关左边。两者都自带 44px 热区，
-              间距靠 gap-3/sm:gap-4，不需要额外内边距 */}
-          <SiteSearch />
+        {/* 右侧控件组。ml-auto 把整组推到最右，即使搜索框没占满也靠右 */}
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-4">
+          {/* 导航：宽屏排成一组带滑动高亮的胶囊。外围包一层只负责显隐，
+              组件本身是客户端组件（要高亮位置、当前页都得靠 JS） */}
+          <div className="hidden md:flex">
+            <SiteNav />
+          </div>
 
-          {/* 开关自带 44px 热区，左右不用再加间距把热区撑开 */}
+          {/* 窄屏用汉堡菜单替代导航链接。外围包一层只负责显隐，
+              组件本身是客户端组件（要管开合状态） */}
+          <div className="md:hidden">
+            <MobileNav />
+          </div>
+
+          {/* 主题开关保留原来的滑块形态（见 theme-toggle.tsx） */}
           <ThemeToggle />
         </div>
       </div>

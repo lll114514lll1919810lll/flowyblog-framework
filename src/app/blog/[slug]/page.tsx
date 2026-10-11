@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 // KaTeX 公式渲染样式（构建时已把公式转成静态 HTML，浏览器只需要这份 CSS）。
@@ -8,6 +9,7 @@ import { PostBody } from "@/components/post-body";
 import { PostNavigation } from "@/components/post-navigation";
 import { getAllPosts, getPostBySlug, getTableOfContents } from "@/lib/posts";
 import { formatDate } from "@/lib/date";
+import { siteConfig } from "@/lib/site";
 
 const isGitHubPages = process.env.GITHUB_PAGES === "true";
 
@@ -39,6 +41,8 @@ export async function generateMetadata({
       type: "article",
       publishedTime: post.publishedAt ?? post.date,
       tags: post.tags,
+      // 分享卡片的封面。siteConfig.url 已含子路径，直接拼封面路径即可得到绝对地址。
+      images: post.cover ? [`${siteConfig.url}${post.cover}`] : undefined,
     },
   };
 }
@@ -110,6 +114,20 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
               </>
             )}
           </div>
+
+          {/* 真实封面作为文章头图，放在标题/元信息之后、正文之前。
+              不写 metadata.cover 的文章不显示这一块。 */}
+          {post.cover && (
+            <div className="relative aspect-[16/9] overflow-hidden rounded-[var(--radius-panel)] border border-border">
+              <Image
+                src={post.cover}
+                alt={post.title}
+                fill
+                sizes="(max-width: 768px) 100vw, 720px"
+                className="object-cover"
+              />
+            </div>
+          )}
         </header>
       }
       footer={

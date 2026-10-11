@@ -103,6 +103,10 @@
   --panel-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -14px rgb(0 0 0 / 0.16);
   --radius-panel: 14px;
 
+  /* 顶栏高度。顶栏本身、搜索浮层、窄屏汉堡菜单面板都从它取「顶栏下沿」，
+     只有一个来源，不会出现两处写死然后对不上的情况。 */
+  --header-h: 3.5rem;
+
   /* 浅色和深色主题使用独立背景资源，便于后续分别替换 */
   --bg-image: var(--bg-image-light);
   /* 背景薄纱：亮色图是中间调（中位亮度 0.427），深色文字直接压上去会糊，
@@ -2149,119 +2153,142 @@ html {
 }
 
 /* ============================================================================
-   站内搜索
+   站内搜索（顶栏内联）
 
+   控件形态参考 XinBlog：顶栏里一枚常驻的药丸输入框，聚焦后正下方弹出
+   结果浮层，边打字边出结果（不再是「图标按钮 + 弹窗」）。
    索引是构建期的静态 JSON（/search-index.json），客户端只负责匹配和渲染。
-   面板沿用亚克力令牌，和图片预览一样用原生 <dialog>（top layer，
-   不受正文面板 backdrop-filter 造成的 fixed 包含块影响）。
    ============================================================================ */
 
-.site-search-trigger {
-  display: grid;
-  place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  flex: none;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--secondary);
-  cursor: pointer;
-  transition: color 160ms ease;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.site-search-trigger:hover {
-  color: var(--foreground);
-}
-
+/* 触发器（锚点）：占据站标与右侧控件之间的弹性空间，窄屏可收缩 */
 .site-search {
-  margin: 8vh auto auto;
-  padding: 0;
-  border: 1px solid var(--panel-border);
-  border-radius: var(--radius-panel);
-  background: var(--panel-bg-strong);
-  backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-saturate));
-  box-shadow: var(--panel-shadow);
-  color: var(--foreground);
-  width: min(92vw, 40rem);
-  max-height: 76vh;
-  overflow: hidden;
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 22rem;
 }
 
-.site-search::backdrop {
-  background: rgb(0 0 0 / 0.5);
-  backdrop-filter: blur(4px);
-}
-
-.site-search[open] {
-  animation: search-in 180ms ease-out;
-}
-
-@keyframes search-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-}
-
-.site-search-box {
-  display: flex;
-  flex-direction: column;
-  max-height: 76vh;
-}
-
-.site-search-field {
+/* 药丸输入框：半透明底 + 细边框，聚焦时边框点亮，和其余交互元素一致 */
+.site-search-pill {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid var(--border);
+  gap: 0.5rem;
+  height: 2.25rem;
+  padding: 0 0.6rem 0 0.75rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: var(--panel-bg-raised);
   color: var(--muted);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
 }
 
-.site-search-field input {
+.site-search-pill:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--surface);
+  color: var(--secondary);
+}
+
+.site-search-icon {
+  flex: none;
+}
+
+.site-search-pill input {
   flex: 1;
   min-width: 0;
   border: 0;
   background: transparent;
   color: var(--foreground);
   font: inherit;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   outline: none;
 }
 
-.site-search-field input::placeholder {
+.site-search-pill input::placeholder {
   color: var(--muted);
 }
 
-/* 关掉 type=search 在 WebKit 下的默认清除按钮，样式不统一 */
-.site-search-field input::-webkit-search-cancel-button {
+/* 关掉 type=search 在 WebKit 下的默认清除按钮，改用下面自绘的「×」 */
+.site-search-pill input::-webkit-search-cancel-button {
   appearance: none;
 }
 
-.site-search-kbd {
+.site-search-clear {
+  display: grid;
   flex: none;
-  padding: 0.15rem 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--surface);
+  width: 1.15rem;
+  height: 1.15rem;
+  place-items: center;
+  border-radius: 999px;
+  background: transparent;
   color: var(--muted);
-  font-family: inherit;
-  font-size: 0.7rem;
-  line-height: 1.4;
+  cursor: pointer;
+  transition: color 160ms ease;
 }
 
-.site-search-results {
-  /* min-height: 0 才能让 flex 子项真正收缩并出现滚动条 */
-  min-height: 0;
+.site-search-clear:hover {
+  color: var(--foreground);
+}
+
+/* 结果浮层。宽屏贴着搜索框左下角弹出：锚点就是药丸容器（.site-search 是
+   relative）。浮层比药丸宽一些，是为了容下标题和正文片段。 */
+.site-search-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 40;
+  width: max(100%, 24rem);
+  max-width: min(92vw, 30rem);
+  max-height: min(64vh, 26rem);
+  padding: 0.35rem;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-panel);
+  background: var(--panel-bg-strong);
+  backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-saturate));
+  box-shadow: var(--panel-shadow);
+  color: var(--foreground);
+  animation: search-in 160ms ease-out;
+}
+
+@keyframes search-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* 窄屏下搜索框本身很窄，贴着它弹出会向右溢出屏幕，
+   改成贴顶栏下沿并水平居中——顶栏是通栏且 sticky 在 top:0，
+   这样定位在任何窄屏下都不会越界。 */
+@media (max-width: 47.9375rem) {
+  .site-search-dropdown {
+    position: fixed;
+    top: calc(var(--header-h) + 0.5rem);
+    left: 50%;
+    width: min(92vw, 30rem);
+    max-width: none;
+    transform: translateX(-50%);
+  }
+}
+
+/* 药丸里的「/」快捷键提示 */
+.site-search-kbd {
+  flex: none;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.68rem;
+  line-height: 1.4;
 }
 
 .site-search-hint {
   margin: 0;
-  padding: 1.1rem 1rem;
+  padding: 0.9rem 0.75rem;
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.8;
@@ -2269,7 +2296,7 @@ html {
 
 .site-search-list {
   margin: 0;
-  padding: 0.35rem;
+  padding: 0;
   list-style: none;
 }
 
@@ -2308,6 +2335,229 @@ html {
   color: inherit;
   border-radius: 3px;
   padding: 0 2px;
+}
+
+/* ============================================================================
+   顶栏导航（宽屏）
+
+   形态参考 XinBlog：整组链接收在一个胶囊容器里，当前页背后有一枚会「滑过去」
+   的高亮胶囊。位置由 JS 量出目标项的矩形后写进 inline style（见 site-nav.tsx），
+   这里只负责外观和位移的补间。
+   ============================================================================ */
+
+.site-nav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.2rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: var(--panel-bg-raised);
+  font-size: 0.8125rem; /* 13px，和原来的导航文字一致 */
+}
+
+/* 高亮胶囊：透明底 + 一层极淡的前景色，两套主题下都是「比容器略亮一档」 */
+.site-nav-indicator {
+  position: absolute;
+  top: 0.2rem;
+  bottom: 0.2rem;
+  left: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 300ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    width 300ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 160ms ease;
+}
+
+.site-nav-indicator[data-visible] {
+  opacity: 1;
+}
+
+.site-nav-link {
+  display: flex;
+  align-items: center;
+  height: 1.9rem;
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  color: var(--secondary);
+  transition: color 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.site-nav-link:hover,
+.site-nav-link[data-active] {
+  color: var(--foreground);
+}
+
+/* 减少动态效果时不要滑动，直接落位 */
+@media (prefers-reduced-motion: reduce) {
+  .site-nav-indicator {
+    transition: none;
+  }
+}
+
+/* ============================================================================
+   窄屏导航菜单
+
+   控件形态参考 XinBlog 的汉堡菜单：宽屏直排导航链接，放不下时收进
+   这里。点开是一个贴顶栏下沿的通栏面板（fixed + --header-h 定位，
+   与搜索浮层同一套思路）。
+   ============================================================================ */
+
+/* 汉堡 ↔ ✕ 的图标。三根绝对定位的横条：展开时上下两根各自旋转 45°
+   并平移到中间（top 6px）交叉，中间那根缩小淡出。
+   尺寸、位移量、缓动都照搬参考站实测到的值：
+   容器 20×14，条高 2px、圆角 2px，条位于 top 0/6/12，
+   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s。 */
+.mobile-nav-icon {
+  position: relative;
+  display: block;
+  width: 20px;
+  height: 14px;
+  /* 整体缩到 95%。用 transform 而不是把每根条的尺寸/位移都改一遍：
+     这样条高、圆角、展开时的 translateY(6px) 会按同一比例缩，
+     交叉点仍落在正中，不用重算一遍几何。 */
+  transform: scale(0.95);
+}
+
+.mobile-nav-bar {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  transition:
+    transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 200ms;
+}
+
+.mobile-nav-bar:nth-child(1) {
+  top: 0;
+}
+
+.mobile-nav-bar:nth-child(2) {
+  top: 6px;
+}
+
+.mobile-nav-bar:nth-child(3) {
+  top: 12px;
+}
+
+.mobile-nav-icon[data-open] .mobile-nav-bar:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.mobile-nav-icon[data-open] .mobile-nav-bar:nth-child(2) {
+  transform: scaleX(0.4);
+  opacity: 0;
+}
+
+.mobile-nav-icon[data-open] .mobile-nav-bar:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+/* 减少动态效果时不做形变：图标直接切换，面板直接收起/展开 */
+@media (prefers-reduced-motion: reduce) {
+  .mobile-nav-bar,
+  .mobile-nav-panel {
+    transition: none;
+  }
+}
+
+.mobile-nav-toggle {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  place-items: center;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--secondary);
+  cursor: pointer;
+  transition: color 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-nav-toggle:hover {
+  color: var(--foreground);
+}
+
+/* 面板：贴顶栏下沿的通栏容器，负责「收起/展开」这个动作。
+   高度用 grid-template-rows 0fr ⇄ 1fr 收缩，内容是「被裁掉」而不是
+   「被压扁」（所以内层要 overflow: hidden）。
+   关闭时 visibility 延迟到高度收完再置 hidden，把里面的链接移出焦点顺序、
+   也让读屏看不到——这一步不能省，否则收起后仍能用 Tab 走到隐藏的链接。 */
+.mobile-nav-panel {
+  position: fixed;
+  top: var(--header-h);
+  right: 0;
+  left: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 280ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 200ms ease,
+    visibility 0s linear 280ms;
+}
+
+.mobile-nav-panel[data-open] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    grid-template-rows 280ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 200ms ease,
+    visibility 0s;
+}
+
+/* 内层就是那块亚克力：.panel 给半透明底、背景模糊、内高光和阴影，
+   .panel-strong 换成更实的底（叠在背景图上的菜单要读得清）。
+   这里只改「从顶栏长出来」该有的形状：去掉上/左/右的边框，只留一条下边，
+   圆角也只在下方。 */
+.mobile-nav-panel-inner {
+  /* min-height: 0 是 grid 子项能被压到 0 高度的前提 */
+  min-height: 0;
+  overflow: hidden;
+  padding: 0.35rem 0;
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+}
+
+.mobile-nav-link {
+  display: flex;
+  align-items: center;
+  /* 左边距和顶栏的 px-4 / sm:px-6 对齐，链接文字与站标同一条竖线 */
+  padding: 0.85rem 1rem;
+  color: var(--secondary);
+  font-size: 0.9rem;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.mobile-nav-link + .mobile-nav-link {
+  border-top: 1px solid var(--border);
+}
+
+.mobile-nav-link:hover {
+  background: var(--accent-soft);
+  color: var(--foreground);
+}
+
+@media (min-width: 40rem) {
+  .mobile-nav-link {
+    padding-inline: 1.5rem;
+  }
 }
 
 /* ============================================================================
@@ -2520,6 +2770,10 @@ html {
 :root[data-lab-corners="square"] .admin-badge,
 :root[data-lab-corners="square"] .reading-width-current,
 :root[data-lab-corners="square"] .field-input,
+:root[data-lab-corners="square"] .site-search-pill,
+:root[data-lab-corners="square"] .site-nav,
+:root[data-lab-corners="square"] .site-nav-indicator,
+:root[data-lab-corners="square"] .site-nav-link,
 :root[data-lab-corners="square"] .lab-select,
 :root[data-lab-corners="square"] .theme-switch-track,
 :root[data-lab-corners="square"] .theme-switch-knob,

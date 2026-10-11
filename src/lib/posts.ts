@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import GithubSlugger from "github-slugger";
+import { withAssetVersion } from "@/lib/asset-version";
 
 /**
  * 博客的内容层。
@@ -19,6 +20,8 @@ export type PostMetadata = {
   date: string; // YYYY-MM-DD
   publishedAt?: string; // ISO 8601，精确到发布时间，用于同日排序
   description?: string;
+  /** 封面图路径（public 下的绝对路径，如 "/images/cover.png"）。不写则用按 slug 生成的图形封面 */
+  cover?: string;
   tags?: string[];
   draft?: boolean;
 };
@@ -276,6 +279,7 @@ function parseMetadata(source: string): PostMetadata {
       date: value.date ?? "1970-01-01",
       publishedAt: value.publishedAt,
       description: value.description,
+      cover: value.cover ? withAssetVersion(value.cover) : undefined,
       tags: value.tags,
       draft: value.draft,
     };

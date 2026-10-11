@@ -57,9 +57,22 @@ const isStaticExport = process.env.NEXT_OUTPUT === "export";
  */
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
+/**
+ * 允许站内图片带查询串。
+ *
+ * 文章封面会自动拼 `?v=<文件修改时间>` 做缓存失效（见 lib/posts.ts），
+ * 而 next/image 默认不允许本地图片带 query，必须在这里显式放开。
+ * 匹配规则里 search 是「严格相等」比较、不支持通配，所以不能写 `?v=*`——
+ * 只能省略 search：不写就不校验查询串，pathname 用通配，
+ * 效果就是「public 下的图片随便带参数」。
+ */
+const LOCAL_IMAGE_PATTERNS = { localPatterns: [{ pathname: "/**" }] };
+
 const nextConfig: NextConfig = {
   // 让 .md / .mdx 文件可以被 Next.js 当作路由或模块处理
   pageExtensions: ["ts", "tsx", "md", "mdx"],
+
+  images: LOCAL_IMAGE_PATTERNS,
 
   ...(basePath
     ? {
@@ -94,8 +107,11 @@ const nextConfig: NextConfig = {
          * 注意：只有导出模式才关。也就是说 `pnpm dev` 走优化器、
          * 线上走原图，两者渲染结果不同——这类「本地好好的、线上才坏」的
          * 问题不会在开发时暴露，改图片相关代码后务必跑一次导出构建验证。
+         *
+         * 这里的 images 是整体替换，必须把上面的 localPatterns 一起带上，
+         * 否则静态导出时会丢掉那条规则、构建直接报错。
          */
-        images: { unoptimized: true },
+        images: { ...LOCAL_IMAGE_PATTERNS, unoptimized: true },
       }
     : {}),
 };

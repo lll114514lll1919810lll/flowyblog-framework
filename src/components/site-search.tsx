@@ -6,10 +6,14 @@ import { useRouter } from "next/navigation";
 import type { SearchDoc, SearchIndex, SearchSection } from "@/lib/search-index";
 
 /**
- * 站内搜索。
+ * 顶栏的内联搜索。
  *
- * 索引是构建期生成的静态 JSON（/search-index.json），这里只在用户第一次
- * 打开搜索时 fetch 一次，之后缓存在模块变量里——不走后端，也不进页面 JS 包。
+ * 控件形态参考 XinBlog（https://xin--blog.pages.dev/ ，MIT 协议）的顶栏设计：
+ * 不再是「一个图标按钮 + 弹窗」，而是顶栏里一枚常驻的药丸输入框，
+ * 聚焦后正下方弹出结果浮层，边打字边出结果。
+ *
+ * 索引仍是构建期生成的静态 JSON（/search-index.json），只在第一次用到时
+ * 拉一次，之后缓存在模块变量里——不走后端，也不进页面 JS 包。
  *
  * 匹配是纯客户端的子串匹配，没有引第三方搜索库：全站不到十篇文章，
  * 简单匹配足够，也省掉一个依赖。中文没有词边界，所以按子串匹配而不是分词；
@@ -155,10 +159,8 @@ function snippet(text: string, tokens: string[], at: number) {
 
 export function SiteSearch() {
   const router = useRouter();
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  /* 按下时是否落在遮罩上。用来区分「点遮罩关闭」和「在框内选字、拖到框外松手」 */
-  const pressedBackdrop = useRef(false);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState<SearchIndex | null>(cached);
@@ -174,73 +176,78 @@ export function SiteSearch() {
     [index, query, tokens.length],
   );
 
-  const openDialog = useCallback(() => {
+  /** 取索引：第一次用到时拉一次，之后走模块缓存 */
+  const ensureIndex = useCallback(() => {
+    if (cached) {
+      setIndex(cached);
+      return;
+    }
+    setStatus("loading");
+    loadIndex()
+      .then((data) => {
+        setIndex(data);
+        setStatus("idle");
+      })
+      .catch(() => setStatus("error"));
+  }, []);
+
+  const openPanel = useCallback(() => {
     setOpen(true);
     setActive(0);
-    dialogRef.current?.showModal();
-    document.documentElement.style.overflow = "hidden";
-    // 预热索引：打开的同时开始拉，用户开始打字时通常已经好了
-    if (!cached) {
-      setStatus("loading");
-      loadIndex()
-        .then((data) => {
-          setIndex(data);
-          setStatus("idle");
-        })
-        .catch(() => setStatus("error"));
-    }
-  }, []);
+    ensureIndex();
+  }, [ensureIndex]);
 
-  /**
-   * 收尾：解锁背景滚动、清状态。幂等，重复调用无害。
-   *
-   * 必须同时挂在 dialog 的原生 cancel / close 上，而不是用 React 的 onClose：
-   * close 事件是**异步排队**触发的（规范如此），在不出帧的环境里它迟迟不跑，
-   * 结果就是「按 Esc 关了、页面却还锁着滚动」。图片预览那里踩过同一个坑。
-   * cancel 在按 Esc 时同步触发，用它兜底。
-   */
-  const finishClose = useCallback(() => {
-    document.documentElement.style.overflow = "";
+  const closePanel = useCallback(() => {
     setOpen(false);
+    setQuery("");
+    setActive(0);
   }, []);
 
-  const closeDialog = useCallback(() => {
-    dialogRef.current?.close();
-    finishClose();
-  }, [finishClose]);
-
+  /* 点浮层之外就收起。用 pointerdown：鼠标/触摸/手写笔一套逻辑，
+     且比 click 早一步，避免「点别处先触发那边的行为、浮层才关」的错位 */
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    dialog.addEventListener("cancel", finishClose);
-    dialog.addEventListener("close", finishClose);
-    return () => {
-      dialog.removeEventListener("cancel", finishClose);
-      dialog.removeEventListener("close", finishClose);
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
-  }, [finishClose]);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
 
-  /* 「/」快速打开：输入框里打字时不抢键 */
+  /* 「/」快速聚焦搜索框：输入框里打字时不抢键 */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
       const el = document.activeElement;
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return;
-      if (dialogRef.current?.open) return;
       event.preventDefault();
-      openDialog();
+      inputRef.current?.focus();
+      openPanel();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [openDialog]);
+  }, [openPanel]);
 
-  /* 打开后自动聚焦输入框 */
-  useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open]);
+  const go = useCallback(
+    (hit: Hit) => {
+      closePanel();
+      inputRef.current?.blur();
+      // 客户端导航；带锚点时浏览器会滚到对应小节
+      router.push(
+        `/blog/${hit.doc.slug}${
+          hit.section.id ? `#${encodeURIComponent(hit.section.id)}` : ""
+        }`,
+      );
+    },
+    [closePanel, router],
+  );
 
   const onInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "ArrowDown") {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closePanel();
+      inputRef.current?.blur();
+    } else if (event.key === "ArrowDown") {
       event.preventDefault();
       setActive((v) => Math.min(v + 1, Math.max(hits.length - 1, 0)));
     } else if (event.key === "ArrowUp") {
@@ -248,27 +255,21 @@ export function SiteSearch() {
       setActive((v) => Math.max(v - 1, 0));
     } else if (event.key === "Enter" && hits[active]) {
       event.preventDefault();
-      const hit = hits[active];
-      closeDialog();
-      // 客户端导航；带锚点时浏览器会滚到对应小节
-      router.push(
-        `/blog/${hit.doc.slug}${
-          hit.section.id ? `#${encodeURIComponent(hit.section.id)}` : ""
-        }`,
-      );
+      go(hits[active]);
     }
   };
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={openDialog}
-        aria-label="搜索文章"
-        title="搜索文章（/）"
-        className="site-search-trigger"
-      >
-        <svg width="17" height="17" viewBox="0 0 18 18" fill="none" aria-hidden>
+    <div className="site-search" ref={rootRef}>
+      <div className="site-search-pill">
+        <svg
+          className="site-search-icon"
+          width="16"
+          height="16"
+          viewBox="0 0 18 18"
+          fill="none"
+          aria-hidden
+        >
           <circle cx="8" cy="8" r="5.2" stroke="currentColor" strokeWidth="1.6" />
           <path
             d="M12 12l3.4 3.4"
@@ -277,112 +278,115 @@ export function SiteSearch() {
             strokeLinecap="round"
           />
         </svg>
-      </button>
 
-      <dialog
-        ref={dialogRef}
-        className="site-search"
-        aria-label="站内搜索"
-        /*
-          关闭判定不能用 click：click 发生在 mousedown 和 mouseup 的**共同祖先**上，
-          在输入框里按下、拖到框外松手，也会产生一个 target 是 dialog 的 click，
-          于是「选个文字就把弹窗弄没了」。
-          改成按下和松开都必须落在遮罩（dialog 自身）上才关闭。
-          用 pointer 事件，鼠标/触摸/手写笔一套逻辑。
-        */
-        onPointerDown={(event) => {
-          pressedBackdrop.current = event.target === dialogRef.current;
-        }}
-        onPointerUp={(event) => {
-          if (pressedBackdrop.current && event.target === dialogRef.current) closeDialog();
-          pressedBackdrop.current = false;
-        }}
-      >
-        <div className="site-search-box">
-          <div className="site-search-field">
-            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden>
-              <circle cx="8" cy="8" r="5.2" stroke="currentColor" strokeWidth="1.6" />
+        <input
+          ref={inputRef}
+          type="search"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setActive(0);
+            if (!open) openPanel();
+          }}
+          onFocus={openPanel}
+          onKeyDown={onInputKeyDown}
+          placeholder="搜索文章…"
+          aria-label="搜索文章"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls="site-search-results"
+          aria-autocomplete="list"
+          autoComplete="off"
+          spellCheck={false}
+        />
+
+        {query ? (
+          <button
+            type="button"
+            className="site-search-clear"
+            aria-label="清空搜索"
+            onClick={() => {
+              setQuery("");
+              setActive(0);
+              inputRef.current?.focus();
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
               <path
-                d="M12 12l3.4 3.4"
+                d="M2.5 2.5l7 7M9.5 2.5l-7 7"
                 stroke="currentColor"
                 strokeWidth="1.6"
                 strokeLinecap="round"
               />
             </svg>
-            <input
-              ref={inputRef}
-              type="search"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                // 换了关键词就把高亮行收回第一条
-                setActive(0);
-              }}
-              onKeyDown={onInputKeyDown}
-              placeholder="搜索文章标题、标签或正文…"
-              aria-label="搜索关键词"
-              autoComplete="off"
-            />
-            <kbd className="site-search-kbd">Esc</kbd>
-          </div>
+          </button>
+        ) : (
+          <kbd className="site-search-kbd" aria-hidden>
+            /
+          </kbd>
+        )}
+      </div>
 
-          <div className="site-search-results" role="listbox" aria-label="搜索结果">
-            {status === "loading" && <p className="site-search-hint">正在读取索引…</p>}
-            {status === "error" && (
-              <p className="site-search-hint">索引加载失败，刷新页面再试。</p>
-            )}
+      {open && (
+        <div
+          className="site-search-dropdown"
+          id="site-search-results"
+          role="listbox"
+          aria-label="搜索结果"
+        >
+          {status === "loading" && <p className="site-search-hint">正在读取索引…</p>}
+          {status === "error" && (
+            <p className="site-search-hint">索引加载失败，刷新页面再试。</p>
+          )}
 
-            {status === "idle" && !tokens.length && (
-              <p className="site-search-hint">
-                输入关键词开始搜索。多个关键词用空格分隔，全部命中才算匹配。
-                <br />
-                按 <kbd className="site-search-kbd">/</kbd> 可以随时打开这里。
-              </p>
-            )}
+          {status === "idle" && !tokens.length && (
+            <p className="site-search-hint">
+              输入关键词搜索文章。多个关键词用空格分隔，全部命中才算匹配。
+            </p>
+          )}
 
-            {status === "idle" && tokens.length > 0 && hits.length === 0 && (
-              <p className="site-search-hint">没有匹配的内容，换个词试试。</p>
-            )}
+          {status === "idle" && tokens.length > 0 && hits.length === 0 && (
+            <p className="site-search-hint">没有匹配的内容，换个词试试。</p>
+          )}
 
-            {hits.length > 0 && (
-              <ul className="site-search-list">
-                {hits.map((hit, i) => {
-                  const { head, parts, tail } = snippet(hit.section.text, tokens, hit.at);
-                  return (
-                    <li key={`${hit.doc.slug}-${hit.section.id}`}>
-                      <Link
-                        href={`/blog/${hit.doc.slug}${
-                          hit.section.id ? `#${encodeURIComponent(hit.section.id)}` : ""
-                        }`}
-                        className="site-search-item"
-                        data-active={i === active ? "true" : undefined}
-                        onMouseEnter={() => setActive(i)}
-                        onClick={closeDialog}
-                      >
-                        <span className="site-search-title">{hit.doc.title}</span>
-                        <span className="site-search-meta">
-                          {hit.doc.date} · {hit.doc.readingTime} 分钟
-                          {hit.section.heading ? ` · ${hit.section.heading}` : ""}
-                          {hit.matches > 1 ? ` · 共 ${hit.matches} 处` : ""}
+          {hits.length > 0 && (
+            <ul className="site-search-list">
+              {hits.map((hit, i) => {
+                const { head, parts, tail } = snippet(hit.section.text, tokens, hit.at);
+                return (
+                  <li key={`${hit.doc.slug}-${hit.section.id}`}>
+                    <Link
+                      href={`/blog/${hit.doc.slug}${
+                        hit.section.id ? `#${encodeURIComponent(hit.section.id)}` : ""
+                      }`}
+                      className="site-search-item"
+                      data-active={i === active ? "true" : undefined}
+                      onMouseEnter={() => setActive(i)}
+                      onClick={closePanel}
+                    >
+                      <span className="site-search-title">{hit.doc.title}</span>
+                      <span className="site-search-meta">
+                        {hit.doc.date} · {hit.doc.readingTime} 分钟
+                        {hit.section.heading ? ` · ${hit.section.heading}` : ""}
+                        {hit.matches > 1 ? ` · 共 ${hit.matches} 处` : ""}
+                      </span>
+                      {hit.at >= 0 && (
+                        <span className="site-search-snippet">
+                          {head}
+                          {parts.map((part, k) =>
+                            part.hit ? <mark key={k}>{part.text}</mark> : <span key={k}>{part.text}</span>,
+                          )}
+                          {tail}
                         </span>
-                        {hit.at >= 0 && (
-                          <span className="site-search-snippet">
-                            {head}
-                            {parts.map((part, k) =>
-                              part.hit ? <mark key={k}>{part.text}</mark> : <span key={k}>{part.text}</span>,
-                            )}
-                            {tail}
-                          </span>
-                        )}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
-      </dialog>
-    </>
+      )}
+    </div>
   );
 }

@@ -15,8 +15,21 @@ export const metadata = {
 | `date` | 是 | `YYYY-MM-DD`，列表按它倒序 |
 | `publishedAt` | 否 | 同日多篇时用它精确排序 |
 | `description` | 否 | 摘要，用于文章页头部分享卡片 |
+| `cover` | 否 | 封面图路径（public 下的绝对路径，如 `/images/cover.png`） |
 | `tags` | 否 | 标签数组，自动生成标签页 |
 | `draft` | 否 | `true` 时不出现在任何公开页面 |
+
+## 加一张真实封面
+
+默认情况下，卡片上的封面是按 slug 生成的一张图形（同一篇文章永远同一张，见 `components/post-card.tsx`）。想换成自己的图，把图片放进 `public/` 下（例如 `public/images/cover.png`），再在 metadata 里写上路径即可：
+
+```tsx
+cover: "/images/cover.png",
+```
+
+写 `cover` 后：列表卡片、首页的置顶卡片、文章页头部都会显示这张图，分享卡片的 `og:image` 也会带上它；不写就继续用图形封面。路径以 `/` 开头（相对 `public/`），别直接写本机磁盘路径。
+
+换图时可以直接覆盖同名文件——构建时会按文件的修改时间给封面自动拼一个 `?v=` 版本号，URL 一变，浏览器和 CDN 的缓存就自动失效了，不用改名也不用清缓存。（前提是重新构建部署过，静态站不推送是不会更新的。）
 
 ## slug 的命名规则
 

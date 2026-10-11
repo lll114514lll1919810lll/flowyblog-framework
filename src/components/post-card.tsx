@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { CSSProperties } from "react";
 import type { Post } from "@/lib/posts";
 import { formatDate } from "@/lib/date";
@@ -146,14 +147,32 @@ export function PostCard({
       >
         <div
           className={`cover-art ${featured ? "min-h-56 md:min-h-full" : "aspect-[2.2/1]"}`}
-          style={cover.background}
+          style={post.cover ? undefined : cover.background}
         >
-          <span className="cover-grid" style={cover.grid} aria-hidden="true" />
-          <span className="cover-orbit" style={cover.orbitOne} aria-hidden="true" />
-          <span className="cover-orbit" style={cover.orbitTwo} aria-hidden="true" />
-          <span className="cover-orbit" style={cover.orbitThree} aria-hidden="true" />
-          <span className="cover-label">NOTES</span>
-          <span className="cover-index">{getPostNumber(post.slug)}</span>
+          {/* 有真实封面就显示图片（object-cover 裁切填满），不再叠装饰图形；
+              没有就回退到按 slug 生成的图形封面。 */}
+          {post.cover ? (
+            <Image
+              src={post.cover}
+              alt=""
+              fill
+              sizes={
+                featured
+                  ? "(max-width: 768px) 100vw, 55vw"
+                  : "(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              }
+              className="object-cover"
+            />
+          ) : (
+            <>
+              <span className="cover-grid" style={cover.grid} aria-hidden="true" />
+              <span className="cover-orbit" style={cover.orbitOne} aria-hidden="true" />
+              <span className="cover-orbit" style={cover.orbitTwo} aria-hidden="true" />
+              <span className="cover-orbit" style={cover.orbitThree} aria-hidden="true" />
+              <span className="cover-label">NOTES</span>
+              <span className="cover-index">{getPostNumber(post.slug)}</span>
+            </>
+          )}
         </div>
 
         <div className={`flex flex-col gap-3 px-5 py-5 ${featured ? "md:justify-center md:px-8 md:py-8" : ""}`}>

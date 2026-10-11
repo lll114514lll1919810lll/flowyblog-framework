@@ -4,6 +4,7 @@ import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { ReadingProgress } from "@/components/reading-progress";
 import { PageTransition } from "@/components/page-transition";
 import { LabRuntimes } from "@/components/lab-runtimes";
+import { withAssetVersion } from "@/lib/asset-version";
 import { LABS_INIT_SCRIPT } from "@/lib/labs";
 import { siteConfig } from "@/lib/site";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
@@ -18,10 +19,17 @@ export const metadata: Metadata = {
 };
 
 const assetBasePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+/**
+ * 背景图路径也拼上版本号：覆盖 public 下的同名图后，URL 一变缓存就失效，
+ * 不用改名（和文章封面同一套机制，见 lib/asset-version.ts）。
+ * 注意先对「相对 public 的路径」取版本号，再加 basePath——文件系统里
+ * 没有 basePath 那一层。
+ */
+const bg = (name: string) => `url("${assetBasePath}${withAssetVersion(`/${name}`)}")`;
 const backgroundStyle = {
-  "--bg-image-light": `url("${assetBasePath}/background-light.png")`,
-  "--bg-image-dark": `url("${assetBasePath}/background-dark.png")`,
-  "--bg-image-cyberpunk": `url("${assetBasePath}/background-cyberpunk.png")`,
+  "--bg-image-light": bg("background-light.png"),
+  "--bg-image-dark": bg("background-dark.png"),
+  "--bg-image-cyberpunk": bg("background-cyberpunk.png"),
 } as CSSProperties;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
