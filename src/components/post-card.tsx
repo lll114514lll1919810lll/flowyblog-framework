@@ -3,6 +3,7 @@ import Image from "next/image";
 import type { CSSProperties } from "react";
 import type { Post } from "@/lib/posts";
 import { formatDate } from "@/lib/date";
+import { withBasePath } from "@/lib/asset-version";
 import { LinkPending } from "@/components/link-pending";
 
 function getPostNumber(slug: string): string {
@@ -153,7 +154,9 @@ export function PostCard({
               没有就回退到按 slug 生成的图形封面。 */}
           {post.cover ? (
             <Image
-              src={post.cover}
+              /* withBasePath：静态导出不加 basePath（见 lib/asset-version.ts），
+                  子路径部署（GitHub Pages）下不加这里就是 404 */
+              src={withBasePath(post.cover)}
               alt=""
               fill
               sizes={

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { withBasePath } from "@/lib/asset-version";
 import { siteConfig } from "@/lib/site";
 
 /**
@@ -8,8 +9,9 @@ import { siteConfig } from "@/lib/site";
  * - 留空（默认）：32px 圆形底 + 站名首字，纯 CSS 渲染，不依赖任何图片资源。
  * - 填 public 下的图片路径（如 "/site-logo.jpg"）：渲染成圆形裁切的图片。
  *   图片走 next/image，导出构建会关闭优化器（images.unoptimized）直接输出
- *   原图路径，静态托管下没有 404 问题；圆形裁切由 .site-logo-badge 的
- *   object-fit: cover 负责。
+ *   原图路径——所以子路径部署下必须手动拼 basePath（withBasePath），
+ *   否则 GitHub Pages 这类部署里 logo 就是 404；圆形裁切由
+ *   .site-logo-badge 的 object-fit: cover 负责。
  *
  * 图片形态下链接里没有可读文字，所以 aria-label 是必须的（读屏会念
  * 「站名，链接」），title 负责鼠标悬停提示；圆点本身 aria-hidden，
@@ -27,7 +29,7 @@ export function SiteLogo() {
     >
       {siteConfig.logo ? (
         <Image
-          src={siteConfig.logo}
+          src={withBasePath(siteConfig.logo)}
           alt=""
           width={32}
           height={32}

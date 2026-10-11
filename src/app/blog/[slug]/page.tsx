@@ -9,6 +9,7 @@ import { PostBody } from "@/components/post-body";
 import { PostNavigation } from "@/components/post-navigation";
 import { getAllPosts, getPostBySlug, getTableOfContents } from "@/lib/posts";
 import { formatDate } from "@/lib/date";
+import { withBasePath } from "@/lib/asset-version";
 import { siteConfig } from "@/lib/site";
 
 const isGitHubPages = process.env.GITHUB_PAGES === "true";
@@ -120,7 +121,9 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
           {post.cover && (
             <div className="relative aspect-[16/9] overflow-hidden rounded-[var(--radius-panel)] border border-border">
               <Image
-                src={post.cover}
+                /* withBasePath：静态导出不加 basePath（见 lib/asset-version.ts），
+                    子路径部署（GitHub Pages）下不加这里就是 404 */
+                src={withBasePath(post.cover)}
                 alt={post.title}
                 fill
                 sizes="(max-width: 768px) 100vw, 720px"
