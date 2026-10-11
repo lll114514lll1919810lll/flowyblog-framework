@@ -37,8 +37,36 @@ export type SearchIndex = {
   docs: SearchDoc[];
 };
 
-/** 每个小节最多索引多少个字符：够搜到，也不至于把索引撑大 */
-const MAX_SECTION_CHARS = 2000;
+/** 每个索引块最多多少个字符：小节超过就切成多块（见 buildSearchIndex），块越小索引越省 */
+const CHUNK_SIZE = 1200;
+/** 相邻两块重叠的字符数：查询词横跨断点时仍能在一侧命中 */
+const CHUNK_OVERLAP = 100;
+
+/**
+ * 去掉 LaTeX 公式源码（$...$ 行内、$$...$$ 块级）。
+ *
+ * remark-math 会把它们渲染成公式，但索引抓的是 MDX 源码——
+ * 不去掉的话，搜「frac」会命中 \frac{a}{b}，摘要里也会冒出 LaTeX 源码。
+ *
+ * 顺序有讲究，不能乱：
+ * 1. 正文里的字面美元按书写规范写成 \$（见 10-latex.mdx 的说明），
+ *    先换成占位符保护起来，否则第 3 步会把它当成公式定界符、
+ *    把货币金额之类的文本一并吃掉；
+ * 2. 成对的 $$...$$ 整块换掉（[\s\S] 让它可以跨行）；
+ * 3. 未闭合的 $$ 删掉至文末（书写错误时的兜底）；
+ * 4. 剩下的成对 $...$ 换掉；
+ * 5. 占位符还原成 $。
+ */
+function stripMath(text: string): string {
+  // 不可能出现在正文里的标记串做占位符
+  const PLACEHOLDER = "__FLOWYBLOG_DOLLAR__";
+  return text
+    .replace(/\\\$/g, PLACEHOLDER)
+    .replace(/\$\$[\s\S]*?\$\$/g, " ")
+    .replace(/\$\$[\s\S]*$/, " ")
+    .replace(/\$[^$\n]+?\$/g, " ")
+    .replaceAll(PLACEHOLDER, "$");
+}
 
 /**
  * 把 MDX 抹成纯文本。
@@ -61,10 +89,13 @@ function toPlainText(source: string): string {
   // 万一有没闭合的围栏，把剩下的也丢掉
   text = text.replace(/^```[\s\S]*$/m, "");
 
-  // 4. JSX/HTML 标签（截图用的 <figure><img> 等）
+  // 4. LaTeX 公式源码（在剥 JSX 之前做：公式里的 < > 不是标签）
+  text = stripMath(text);
+
+  // 5. JSX/HTML 标签（截图用的 <figure><img> 等）
   text = text.replace(/<[^>]+>/g, " ");
 
-  // 5. 行内标记
+  // 6. 行内标记
   text = text
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1") // 图片 → alt
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // 链接 → 文字
@@ -105,6 +136,7 @@ export function buildSearchIndex(): SearchIndex {
     let current: SearchSection = { id: "", heading: "", text: "" };
 
     let inCodeBlock = false;
+    let inMathBlock = false;
     let inMetadata = false;
     for (const rawLine of source.split("\n")) {
       // metadata 是多行对象字面量，必须连对象体一起跳过；
@@ -122,16 +154,24 @@ export function buildSearchIndex(): SearchIndex {
         continue;
       }
       if (inCodeBlock) continue;
+      // 整行的 $$ 切换公式块，块内容不进索引（$$x^2$$ 这种单行形式
+      // 过不了这里的正则，由 toPlainText 里的 stripMath 兜底）
+      if (/^\s*\$\$\s*$/.test(rawLine)) {
+        inMathBlock = !inMathBlock;
+        continue;
+      }
+      if (inMathBlock) continue;
       if (/^\s*(import|export)\s/.test(rawLine)) continue;
 
       const heading = /^(#{2,3})\s+(.+?)\s*#*$/.exec(rawLine);
       if (heading) {
         if (current.text.trim()) sections.push(current);
-        const title = heading[2]
-          .replace(/`([^`]*)`/g, "$1")
-          .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-          .replace(/[*_~]/g, "")
-          .trim();
+        const title = stripMath(
+          heading[2]
+            .replace(/`([^`]*)`/g, "$1")
+            .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+            .replace(/[*_~]/g, ""),
+        ).trim();
         current = { id: slugger.slug(title), heading: title, text: "" };
         continue;
       }
@@ -139,6 +179,22 @@ export function buildSearchIndex(): SearchIndex {
       current.text += rawLine + "\n";
     }
     if (current.text.trim()) sections.push(current);
+
+    /*
+      超长小节切成多块共享同一锚点：旧做法直接截断到定长，截点之后的
+      内容永远搜不到。分块后「共 N 处」等统计按 id 去重（见 search-client.ts），
+      不会因为一块变多块而虚高。
+    */
+    const chunksOf = (text: string): string[] => {
+      if (text.length <= CHUNK_SIZE) return [text];
+      const chunks: string[] = [];
+      const step = CHUNK_SIZE - CHUNK_OVERLAP;
+      for (let start = 0; ; start += step) {
+        chunks.push(text.slice(start, start + CHUNK_SIZE));
+        if (start + CHUNK_SIZE >= text.length) break;
+      }
+      return chunks;
+    };
 
     return {
       slug: post.slug,
@@ -148,13 +204,18 @@ export function buildSearchIndex(): SearchIndex {
       description: post.description ?? "",
       tags: post.tags ?? [],
       readingTime: post.readingTime ?? 0,
-      sections: sections.map((section) => ({
-        id: section.id,
-        heading: section.heading,
-        text: toPlainText(section.text).slice(0, MAX_SECTION_CHARS),
-      })),
+      sections: sections.flatMap((section) => {
+        const plain = toPlainText(section.text);
+        // 正文全是代码/公式的小节会变成空串，不进索引
+        if (!plain) return [];
+        return chunksOf(plain).map((text) => ({
+          id: section.id,
+          heading: section.heading,
+          text,
+        }));
+      }),
     };
   });
 
-  return { version: 1, docs };
+  return { version: 2, docs };
 }

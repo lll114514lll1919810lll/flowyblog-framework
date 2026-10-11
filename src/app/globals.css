@@ -2330,6 +2330,271 @@ html {
   padding: 0 2px;
 }
 
+/* 浮层底部的「查看全部结果」：跳 /search 独立搜索页 */
+.site-search-more {
+  display: block;
+  margin-top: 0.25rem;
+  padding: 0.55rem 0.75rem;
+  border-top: 1px solid var(--panel-border);
+  color: var(--accent);
+  font-size: 0.8rem;
+  transition: opacity 160ms ease;
+}
+
+.site-search-more:hover {
+  opacity: 0.75;
+}
+
+/* 提示文字里内嵌的链接（如「在搜索页中继续查找」） */
+.site-search-hint-link {
+  color: var(--accent);
+}
+
+.site-search-hint-link:hover {
+  text-decoration: underline;
+}
+
+/* ============================================================================
+   独立搜索页 /search
+
+   顶栏快捷浮层的「完整版」：查询词同步 URL、按文章分组列出全部命中、
+   标签筛选。样式令牌与顶栏搜索（.site-search-*）保持同一套。
+   ============================================================================ */
+
+/* 页头里的搜索输入条：比顶栏药丸大一号，形态同一套 */
+.search-page-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: 34rem;
+  height: 2.75rem;
+  padding: 0 0.8rem 0 1rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: var(--panel-bg-raised);
+  color: var(--muted);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.search-page-bar:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--surface);
+  color: var(--secondary);
+}
+
+.search-page-bar input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.95rem;
+  outline: none;
+}
+
+.search-page-bar input::placeholder {
+  color: var(--muted);
+}
+
+.search-page-bar input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.search-page-bar-clear {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.search-page-bar-clear:hover {
+  color: var(--foreground);
+}
+
+.search-page-bar-kbd {
+  flex: none;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+/* 标签筛选 chips：单选，再点一次取消 */
+.search-page-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.search-page-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: var(--panel-bg-raised);
+  color: var(--secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.search-page-chip:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--foreground);
+}
+
+.search-page-chip[data-active="true"] {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.search-page-chip-count {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.search-page-chip[data-active="true"] .search-page-chip-count {
+  color: inherit;
+}
+
+/* 模糊回退提示：虚线边框和普通结果区分开 */
+.search-page-fuzzy-hint {
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: var(--radius-panel);
+  background: var(--accent-soft);
+  color: var(--secondary);
+  font-size: 0.82rem;
+}
+
+/* 结果分组：一篇文章一块面板 */
+.search-page-group {
+  padding: 1rem 1.25rem;
+}
+
+.search-page-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.search-page-group-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  transition: color 160ms ease;
+}
+
+.search-page-group-title:hover {
+  color: var(--accent);
+}
+
+.search-page-group-meta {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.search-page-hits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.search-page-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.65rem 0.5rem;
+  border-radius: 10px;
+  transition: background-color 140ms ease;
+}
+
+.search-page-hit:hover {
+  background: var(--accent-soft);
+}
+
+.search-page-hit-heading {
+  color: var(--secondary);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.search-page-hit-snippet {
+  color: var(--secondary);
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+.search-page-hit-snippet mark {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+/* 分页条：页码走 URL（?page=），样式与标签 chips 同一形态 */
+.search-page-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.search-page-pagebtn {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: var(--panel-bg-raised);
+  color: var(--secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.search-page-pagebtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--foreground);
+}
+
+.search-page-pagebtn[data-active="true"] {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.search-page-pagebtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.search-page-gap {
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 0 0.15rem;
+}
+
 /* ============================================================================
    顶栏导航（宽屏）
 
