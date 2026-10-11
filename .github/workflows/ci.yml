@@ -78,9 +78,10 @@ jobs:
           echo "已检查 $count 个 Functions 文件"
 
       # 必须带 NEXT_OUTPUT=export，否则测的是本地构建路径，
-      # 而不是真实上线的那条路径——那 CI 就失去意义了
+      # 而不是真实上线的那条路径——那 CI 就失去意义了。
+      # basePath 按仓库名自动派生，与 pages.yml 的生产构建保持同源。
       - name: 静态导出构建
-        run: NEXT_OUTPUT=export GITHUB_PAGES=true NEXT_PUBLIC_BASE_PATH=/flowyblog-framework pnpm build
+        run: NEXT_OUTPUT=export GITHUB_PAGES=true NEXT_PUBLIC_BASE_PATH=/${{ github.event.repository.name }} pnpm build
 
       - name: 校验导出产物
         run: |

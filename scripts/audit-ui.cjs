@@ -532,8 +532,8 @@ async function auditAnimations(send) {
 const PAGES = [
   { name: '首页', path: '/' },
   { name: '文章列表', path: '/blog' },
-  { name: '文章详情', path: '/blog/1-hello-world' },
-  { name: '短文章', path: '/blog/1-hello-world' },
+  { name: '文章详情', path: '/blog/10-hello-world' },
+  { name: '短文章', path: '/blog/10-hello-world' },
   { name: '标签', path: '/tags' },
   { name: '关于', path: '/about' },
 ];

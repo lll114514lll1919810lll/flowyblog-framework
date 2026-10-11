@@ -78,7 +78,7 @@ export const siteConfig = {
 
 ## 写文章
 
-在 `src/content/` 新建 `序号-标题.mdx` 文件。文件名就是文章 URL 的 slug，例如 `1-my-first-post.mdx` 对应 `/blog/1-my-first-post`。文章排序由文件名的序号决定。
+在 `src/content/` 新建 `序号-标题.mdx` 文件。文件名就是文章 URL 的 slug，例如 `1-my-first-post.mdx` 对应 `/blog/1-my-first-post`。文章排序由 metadata 里的 `date`（可选 `publishedAt`）倒序决定，文件名的序号只影响 slug、不影响排序。
 
 ```mdx
 export const metadata = {
@@ -102,7 +102,7 @@ export const metadata = {
 - 支持 GFM 表格、任务列表、代码块和 JSX；表格自动包裹横向滚动容器。
 - 标题里的行内代码会正确生成锚点（反引号会被剥掉再算 slug）。
 - 图片放 `public/images/`，正文用绝对路径引用，`alt` 必须写。
-- 随附的 `src/content/hello-world.mdx` 是一篇覆盖常用元素的示例文章，跑通后可删除。
+- `src/content/` 随附一组示例文章（`1-` 到 `10-`），覆盖常用排版元素、metadata 字段、MDX 高级用法、部署、主题与同日排序，`1-draft-example` 演示草稿（不会出现在站点上）。跑通后可整批删除。
 
 ## 目录结构
 
@@ -142,7 +142,7 @@ NEXT_OUTPUT=export pnpm build
 
 ### GitHub Pages
 
-仓库已配置 `.github/workflows/pages.yml`，推送到 `main` 后会自动构建并发布到 GitHub Pages。项目站点使用仓库路径 `/flowyblog-framework`，因此部署到自己的项目仓库时，需要同步修改 `next.config.ts` 中的 `basePath`、工作流里的 `NEXT_PUBLIC_BASE_PATH`，以及 `src/lib/site.ts` 中的站点地址。
+仓库已配置 `.github/workflows/pages.yml`，推送到 `main` 后会自动构建并发布到 GitHub Pages。项目站点的 basePath 由工作流按仓库名自动派生（`NEXT_PUBLIC_BASE_PATH=/${{ github.event.repository.name }}`，CI 与生产构建同源），fork 或仓库改名后不需要改任何文件；部署到自己的项目仓库时，只需更新 `src/lib/site.ts` 中的站点地址。
 
 ### 评论与后台
 

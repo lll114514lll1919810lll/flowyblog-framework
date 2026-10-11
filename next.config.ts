@@ -40,17 +40,23 @@ const withMDX = createMDX({
  * 静态导出后产物里没有 Node 服务器，`pnpm start` 会直接失效。
  */
 const isStaticExport = process.env.NEXT_OUTPUT === "export";
-const isGitHubPages = process.env.GITHUB_PAGES === "true";
-const githubPagesBasePath = isGitHubPages ? "/flowyblog-framework" : "";
+
+/**
+ * 子路径部署（GitHub Pages 项目站点等）的 basePath 只有这一个来源：
+ * NEXT_PUBLIC_BASE_PATH 环境变量。CI 里用 github.event.repository.name
+ * 自动派生为 /<仓库名>，fork 或仓库改名后不需要改任何文件；
+ * 本地想模拟子路径时手动设置同名变量即可。不设置就是根路径部署。
+ */
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 const nextConfig: NextConfig = {
   // 让 .md / .mdx 文件可以被 Next.js 当作路由或模块处理
   pageExtensions: ["ts", "tsx", "md", "mdx"],
 
-  ...(isGitHubPages
+  ...(basePath
     ? {
-        basePath: githubPagesBasePath,
-        assetPrefix: `${githubPagesBasePath}/`,
+        basePath,
+        assetPrefix: `${basePath}/`,
       }
     : {}),
 

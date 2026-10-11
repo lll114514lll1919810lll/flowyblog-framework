@@ -104,7 +104,10 @@ async function main() {
   check("不含 draft 文章", getAllPosts().every((p) => !p.draft));
 
   console.log(`\n结果: ${passed} 通过, ${failed} 失败`);
-  process.exit(failed > 0 ? 1 : 0);
+  // 不用 process.exit 强退：上面 fetch 成功时 undici 的 keep-alive 连接还开着，
+  // Windows 上强退会触发 libuv 的 UV_HANDLE_CLOSING 断言崩溃（退出码非 0，
+  // 看起来像测试失败）。设置 exitCode 后让空闲连接自然关闭、事件循环排空。
+  process.exitCode = failed > 0 ? 1 : 0;
 }
 
 main();

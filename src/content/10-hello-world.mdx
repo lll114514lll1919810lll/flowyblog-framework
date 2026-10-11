@@ -1,16 +1,16 @@
 export const metadata = {
-  title: "第一篇文章：这个框架怎么用",
+  title: "这个框架怎么用",
   date: "2026-10-11",
   publishedAt: "2026-10-11T09:00",
   description: "从一篇示例看懂文章怎么写：metadata 格式、常用排版元素、代码块和发布流程。",
   tags: ["示例"],
 }
 
-把这篇文章的源码打开对照着看（`src/content/hello-world.mdx`），写作时常用的元素都在里面演示了一遍。看完就可以删掉它，开始写自己的第一篇。
+把这篇文章的源码打开对照着看（`src/content/10-hello-world.mdx`），写作时常用的元素都在里面演示了一遍。看完就可以删掉它，开始写自己的第一篇。
 
 ## 文章从哪来
 
-文章是 `src/content/` 下的 `.mdx` 文件，文件名（不含扩展名）就是 URL 里的 slug。比如 `1-hello-world.mdx` 对应 `/blog/1-hello-world`。新建文件、开头写一段 metadata，`pnpm dev` 下保存即可生效：
+文章是 `src/content/` 下的 `.mdx` 文件，文件名（不含扩展名）就是 URL 里的 slug。比如 `10-hello-world.mdx` 对应 `/blog/10-hello-world`。新建文件、开头写一段 metadata，`pnpm dev` 下保存即可生效：
 
 ```tsx
 export const metadata = {

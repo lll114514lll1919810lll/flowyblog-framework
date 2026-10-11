@@ -1,0 +1,48 @@
+export const metadata = {
+  title: "代码块与语法高亮",
+  date: "2026-09-26",
+  description: "代码块的语言标签、复制按钮和双主题高亮是怎么工作的，以及几个排版上的建议。",
+  tags: ["示例", "Markdown"],
+}
+
+代码块是技术文章的主角。框架里它由 rehype-pretty-code（Shiki）驱动，自带语言标签和复制按钮，不需要额外配置。
+
+## 基本用法
+
+用三个反引号开头并标注语言：
+
+```bash
+pnpm install
+pnpm dev
+```
+
+## 双主题高亮
+
+高亮同时输出浅色和深色两套颜色到 CSS 变量，切换明暗主题时纯 CSS 生效，没有任何 JS 参与，也不会闪烁：
+
+```ts
+export function formatDate(date: string): string {
+  const [y, m, d] = date.split("-");
+  return `${y} 年 ${Number(m)} 月 ${Number(d)} 日`;
+}
+```
+
+试试切换右上角的主题开关——上面这段代码的颜色会跟着变。
+
+## 几个排版建议
+
+- 代码块前后各留一句话：前面说明它演示什么，后面指出关键结果
+- 短命令用行内代码就够了，不必为了两三个词开一个代码块
+- 同一段代码别超过 20 行，读者要的是思路，不是完整工程
+- 配置文件贴关键片段即可，省略的部分用注释标出来
+
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build"
+  }
+}
+```
+
+JSON 这类结构化内容尤其适合代码块：缩进就是语义，别用正文排版去模拟。

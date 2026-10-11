@@ -1,0 +1,47 @@
+export const metadata = {
+  title: "部署到 Cloudflare Pages",
+  date: "2026-08-30",
+  description: "从静态构建到 D1 数据库初始化，一次跑通带评论功能的完整部署。",
+  tags: ["部署", "指南"],
+}
+
+框架的完整功能（含评论）部署在 Cloudflare Pages 上：页面静态导出，评论走 Pages Functions + D1，全部使用免费额度。
+
+## 构建静态产物
+
+Cloudflare Pages 的构建命令里注入导出开关：
+
+```bash
+NEXT_OUTPUT=export pnpm build
+```
+
+构建输出目录设为 `out`。导出模式下图片优化器会被关闭，这是静态托管的硬性要求，不需要也不应该再打开。
+
+## 初始化评论数据库
+
+```bash
+# 创建 D1 数据库，把返回的 ID 填进 wrangler.toml
+npx wrangler d1 create fblog-comments
+
+# 建表
+npx wrangler d1 execute fblog-comments --remote --file=db/schema.sql
+```
+
+## 配置环境变量
+
+在 Cloudflare Pages 项目设置里配置以下变量（本地开发写在 `.dev.vars`，不要提交）：
+
+| 变量 | 用途 |
+| --- | --- |
+| `ADMIN_KEY` | 管理后台登录密钥 |
+| `SESSION_SECRET` | 管理会话签名密钥 |
+| `IP_SALT` | 评论者 IP 哈希的盐 |
+| `ALLOWED_ORIGINS` | 允许调用评论接口的来源，逗号分隔 |
+
+## 推送部署
+
+```bash
+git push
+```
+
+推送后 Pages 自动构建。以后新增文章、改配置都只需要 push，没有别的发布步骤。已有旧版本数据库时，记得按顺序补跑 `db/migrations/` 下的迁移脚本。
