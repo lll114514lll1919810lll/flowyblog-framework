@@ -48,22 +48,22 @@
   --accent-soft: #eff6ff;
   /* 开关（主题开关 + 实验室开关）的一套配色令牌。
 
-     浅色下用比 --accent 浅一档的蓝（#3b82f6 对 #2563eb）：强调色是给文字
-     用的，压成实心滑块显得沉。图标仍是反白（--background），没有跟着改成
-     深色——白图标压在浅蓝上实测 3.68:1，达到非文本图形的 3:1，看着也更清爽。
-     深色主题反过来：那边白滑块才是与面板对比最强的（两份深色令牌里都写）。
+     浅色下滑块直接用 --accent：强调色换成什么滑块就跟什么
+     （书本模式的土黄、以后改主题色都自动跟上）。图标保持反白
+     （--background）：白图标压在默认蓝 #2563eb 上实测 ≈5.2:1，
+     远超非文本图形的 3:1。深色主题反过来：那边白滑块才是与面板
+     对比最强的，不跟强调色（两份深色令牌里都写，实验室的赛博朋克
+     也显式押回白滑块，免得霓虹青滑块吃掉反白图标的对比度）。
 
      两个值是一组，改一个要连另一个一起算：
        --switch-knob   滑块填充
        --switch-track  轨道
 
-     实测（check-theme.cjs 会断言）：
-       滑块 / 轨道           #3b82f6 / #ececef = 3.12:1（≥3）
-       白图标 / 滑块         #ffffff / #3b82f6 = 3.68:1（≥3，非文本图形）
-       另一枚图标 / 轨道     #63636d / #ececef = 5.04:1（≥3）
-     轨道从 --border（#e4e4e7）提亮到 #ececef 是这次一起做的：滑块变浅之后，
-     原来的轨道只有 2.96:1，正好压在 3:1 门槛下面。想再浅就还得提轨道。 */
-  --switch-knob: #3b82f6;
+     实测（check-theme.cjs 会断言，默认蓝下）：
+       滑块 / 轨道           #2563eb / #ececef = 4.4:1（≥3）
+       白图标 / 滑块         #ffffff / #2563eb = 5.2:1（≥3，非文本图形）
+       另一枚图标 / 轨道     #63636d / #ececef = 5.04:1（≥3） */
+  --switch-knob: var(--accent);
   --switch-track: #ececef;
   /* 管理员金色徽标：全站唯一的第二种彩色，只给这一个标记用。
      浅色下用金棕而不是亮金——亮金（#eab308 一类）压在面板上只有
@@ -724,7 +724,6 @@
   .hero-orbit-ring { position: absolute; z-index: 1; width: calc(100% - 3rem); height: 46%; border: 1px solid var(--border); border-radius: 50%; clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%); }
   .hero-orbit-ring-lower { z-index: 3; clip-path: polygon(0 50%, 100% 50%, 100% 100%, 0 100%); }
   .hero-orbit-ring-one { width: calc(100% - 6rem); height: 32%; border-color: color-mix(in srgb, var(--accent) 30%, transparent); animation: hero-ring-breathe 7s ease-in-out infinite; }
-  .hero-orbit-ring-two { width: 76%; height: 42%; opacity: 0.52; animation: hero-ring-breathe-reverse 9s ease-in-out infinite; }
   /*
     两个电子共用同一条椭圆轨道、同一个周期，只差半个相位：始终中心对称、速度一致。
     offset-distance 按弧长推进，速度均匀；层级在靠近观察者的一侧切到核之上，
@@ -756,11 +755,6 @@
     50% { transform: scale(1, 1.04); opacity: 1; }
   }
 
-  @keyframes hero-ring-breathe-reverse {
-    0%, 100% { transform: scale(1, 0.96); opacity: 0.42; }
-    50% { transform: scale(0.96, 1.04); opacity: 0.65; }
-  }
-
   @keyframes hero-electron-orbit {
     from { offset-distance: 0%; }
     to { offset-distance: 100%; }
@@ -777,7 +771,6 @@
     .hero-orbit-core,
     .hero-atom,
     .hero-orbit-ring-one,
-    .hero-orbit-ring-two,
     .hero-orbit-dot { animation: none; }
     /* 静止时两点分居核心前后 */
     .hero-orbit-dot { offset-distance: 25%; z-index: 3; }
@@ -937,8 +930,8 @@
   }
 
   /* 默认（浅色）状态：滑块在左，太阳反白压在上面。
-     反白在浅蓝滑块上是 3.68:1，够非文本图形的 3:1；
-     真要压到 4.5 就得把滑块调回 #2563eb 那么深，与「浅一点」冲突。 */
+     反白压在主题色滑块上（默认蓝 #2563eb）实测 ≈5.2:1，
+     远超非文本图形的 3:1。 */
   .theme-switch-sun {
     color: var(--background);
   }
@@ -2826,7 +2819,8 @@ html {
     "Source Han Serif SC", serif;
 }
 
-/* 浅色：米黄纸 + 墨色字 */
+/* 浅色：米黄纸 + 墨色字。强调色跟着换成土黄（赭石），蓝压在暖纸上是
+   全书唯一的冷色，太跳；土黄 #8a5f10 压米黄纸实测 ≈5.0:1（AA 达标）。 */
 @media (prefers-color-scheme: light) {
   :root[data-lab-book="on"] {
     --background: #f6f0e1;
@@ -2835,6 +2829,8 @@ html {
     --secondary: #5c574b;
     --muted: #6f6a5d;
     --border: #ddd3bd;
+    --accent: #8a5f10;
+    --accent-soft: #f1e7cd;
     --panel-bg: #fbf7ec;
     --panel-bg-strong: #fdfaf2;
     --panel-bg-raised: #f2ecdc;
@@ -2852,6 +2848,8 @@ html {
   --secondary: #5c574b;
   --muted: #6f6a5d;
   --border: #ddd3bd;
+  --accent: #8a5f10;
+  --accent-soft: #f1e7cd;
   --panel-bg: #fbf7ec;
   --panel-bg-strong: #fdfaf2;
   --panel-bg-raised: #f2ecdc;
@@ -2861,7 +2859,8 @@ html {
 }
 
 /* 深色：深灰纸面 + 暖白字。饱和度都压得很低，
-   深灰纸的对比靠明度差而不是色相差。 */
+   深灰纸的对比靠明度差而不是色相差。强调色同样换土黄，
+   提亮成 #d9a441 压深灰纸实测 ≈6.7:1。 */
 @media (prefers-color-scheme: dark) {
   :root[data-lab-book="on"]:not([data-theme="light"]) {
     --background: #26262a;
@@ -2870,6 +2869,8 @@ html {
     --secondary: #a9a599;
     --muted: #9c988d;
     --border: #3b3b40;
+    --accent: #d9a441;
+    --accent-soft: #382f1d;
     --panel-bg: #2d2d32;
     --panel-bg-strong: #323237;
     --panel-bg-raised: #29292e;
@@ -2887,6 +2888,8 @@ html {
   --secondary: #a9a599;
   --muted: #9c988d;
   --border: #3b3b40;
+  --accent: #d9a441;
+  --accent-soft: #382f1d;
   --panel-bg: #2d2d32;
   --panel-bg-strong: #323237;
   --panel-bg-raised: #29292e;

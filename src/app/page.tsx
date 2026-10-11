@@ -66,8 +66,6 @@ export default function HomePage() {
           </div>
           <span className="hero-orbit-ring hero-orbit-ring-one" />
           <span className="hero-orbit-ring hero-orbit-ring-one hero-orbit-ring-lower" />
-          <span className="hero-orbit-ring hero-orbit-ring-two" />
-          <span className="hero-orbit-ring hero-orbit-ring-two hero-orbit-ring-lower" />
           <span className="hero-orbit-dot" />
           <span className="hero-orbit-dot hero-orbit-dot-two" />
         </div>
