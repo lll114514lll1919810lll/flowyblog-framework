@@ -46,3 +46,6 @@ next-env.d.ts
 # Cloudflare 本地开发密钥（含 ADMIN_KEY，绝不能提交）
 .dev.vars
 .wrangler/
+
+# Setup 向导状态（记录进度与生成的密钥明文，绝不能提交）
+/.setup/

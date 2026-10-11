@@ -4,6 +4,8 @@
   "license": "AGPL-3.0-only",
   "private": true,
   "scripts": {
+    "setup": "tsx scripts/setup/index.ts",
+    "setup:ui": "tsx scripts/setup/web.ts",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

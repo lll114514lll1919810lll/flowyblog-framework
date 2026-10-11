@@ -23,6 +23,29 @@ GitHub Pages 构建会关闭依赖 Cloudflare Functions 的评论区。文章、
 
 本博客的完整功能可以完全免费的部署在 Cloudflare 上，使用页面构建/数据库的免费额度。
 
+## 建站正确流程（推荐）
+
+推荐路径：**fork 仓库 → clone 到本地 → 跑 WebUI 向导 → 用 AI agent 日常维护**。不要直接下载源码压缩包开跑——fork 之后提交两个配置文件，仓库就变成你自己的站，同时满足 AGPL「向访客提供源码」的义务，还能随时 `git pull` 获取框架更新、走推送自动部署。
+
+1. **Fork 本仓库**到你的 GitHub 账号（仓库页右上角 Fork）。
+2. **Clone 到本地**：
+
+   ```bash
+   git clone https://github.com/你的用户名/你的仓库名
+   cd 你的仓库名
+   ```
+
+3. **准备环境**：安装 [Node.js](https://nodejs.org) 20+，然后 `corepack enable` 启用 pnpm（或 `npm i -g pnpm`），再执行 `pnpm install`。
+4. **跑 WebUI 向导**完成基础流程：
+
+   ```bash
+   pnpm run setup:ui
+   ```
+
+   按引导走完：站点配置（含 Pages 项目名）→ Cloudflare 授权 → 创建评论数据库 → 生成密钥 → 构建并发布。做完博客就上线了，地址是 `https://<项目名>.pages.dev`。全程幂等，中断重跑会跳过已完成的部分。
+5. **写文章**：在 `src/content/` 新建 `序号-标题.mdx`（写法见下文「写文章」），写完回到向导重跑「构建并发布」即可上线。以后更新有两条路：重跑发布步骤（本地构建直传），或在 Cloudflare Pages 后台把项目连接到你的 Git 仓库，之后 push 即自动部署。
+6. **强烈推荐在仓库目录跑一个 AI agent**（Trae、DSH、Claude Code 等均可）辅助写作和维护：让它先读 `README.md`、`src/lib/site.ts` 和 `src/content/` 里现有文章的写法，再替你写文章、改配置、确定个人文章协议等，改完提交推送（或重跑发布）。注意 `.setup/`（含密钥明文）和 `.dev.vars` 绝不能提交或外发。
+
 ## 快速开始
 
 需要 Node.js 和 pnpm：
@@ -37,6 +60,8 @@ pnpm dev
 
 | 命令 | 用途 |
 | --- | --- |
+| `pnpm run setup` | 一键安装向导（配置站点 → Cloudflare 授权 → 建库 → 部署） |
+| `pnpm run setup:ui` | 图形界面向导（本地 Web 页面，功能与 `setup` 相同） |
 | `pnpm dev` | 启动开发服务器 |
 | `pnpm build` | 执行生产构建 |
 | `pnpm typegen` | 生成 Next.js 路由类型（`PageProps` / `LayoutProps`） |
@@ -127,6 +152,26 @@ public/           背景图和其他静态资源
 实验室开关通过 `<html data-labs>` 传递，配置在 `src/lib/labs.ts`，样式全部以 CSS 变量/选择器的形式集中在 `globals.css`，不修改组件代码。新增实验的路径：在 `labs.ts` 注册开关 → 在 `globals.css` 加对应令牌覆盖。个别实验有已知的兼容限制（如书本模式与液态玻璃同时开启时液态玻璃不生效；赛博朋克锁定夜间模式），说明写在 `/lab` 页面上。
 
 ## 部署
+
+### 一键向导（推荐）
+
+不想手动执行下面的步骤时，直接运行（必须带 `run`——裸 `pnpm setup` 是 pnpm 的内建命令，会被它拦截）：
+
+```bash
+pnpm run setup
+```
+
+向导会依次完成：站点信息配置（自动改写 `src/lib/site.ts`）→ 环境检测 → Cloudflare 登录 → 创建并初始化 D1 → 生成密钥写入 `.dev.vars` → 静态导出并发布到 Cloudflare Pages（含评论区）。全程幂等，中断后重跑会自动跳过已完成的步骤。
+
+也支持非交互参数（自动化与图形界面复用同一套步骤）：
+
+```bash
+pnpm run setup --answers answers.json   # 预填答案，跳过提问
+pnpm run setup --step deploy            # 只跑某一步（--list 查看全部步骤）
+pnpm run setup --json                   # JSON 事件流输出，供上层界面订阅
+```
+
+### 手动部署
 
 页面构建为纯静态文件后交给 Cloudflare Pages（构建输出目录设为 `out`）：
 
