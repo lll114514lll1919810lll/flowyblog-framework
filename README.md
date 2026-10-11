@@ -1,12 +1,6 @@
 # FlowyBlog Framework
 
-FlowyBlog Framework 是一个使用 Next.js、TypeScript、Tailwind CSS 和 MDX 搭建的中文博客框架。
-页面静态导出后部署在 Cloudflare Pages，评论走 Pages Functions + D1，
-内置明暗主题、阅读体验调节、全站搜索和一个可开关的「实验室」外观实验
-系统（含液态玻璃、书本模式、赛博朋克等）。
-
-框架剥离自一个实际运行的博客：布局、样式、组件、实验室、评论后台都是
-验证过的可用状态，站点信息和文章已清空为占位符，改配置即可变成自己的站。
+FlowyBlog Framework 是一个使用 Next.js、TypeScript、Tailwind CSS 和 MDX 搭建的中文博客框架。页面静态导出后部署在 Cloudflare Pages，评论系统使用 Pages Functions + D1，内置明暗主题、阅读体验调节、全站搜索和一个可开关的「实验室」外观实验系统（含液态玻璃、书本模式、赛博朋克等）。
 
 ## 在线预览
 
@@ -14,21 +8,20 @@ FlowyBlog Framework 是一个使用 Next.js、TypeScript、Tailwind CSS 和 MDX 
 
 <https://lll114514lll1919810lll.github.io/flowyblog-framework/>
 
-GitHub Pages 构建会关闭依赖 Cloudflare Functions 的评论区，文章、搜索、
-主题和实验室等静态功能仍然可用。
+GitHub Pages 构建会关闭依赖 Cloudflare Functions 的评论区。文章、搜索、主题和实验室等静态功能仍然可用。
 
 ## 功能一览
 
 - **内容**：MDX 文章，自动生成列表、标签、按月归档、分页、RSS 式 sitemap
-- **阅读体验**：目录侧栏（锚点高亮）、阅读进度条、上下篇导航、阅读时长
-  估算、正文宽度可调、代码块复制按钮、表格横向滚动
-- **外观**：明暗双主题（跟随系统 + 手动切换）、亚克力面板质感、
-  程序化文章封面（基于 slug 确定性生成）
-- **实验室**：`/lab` 页面提供一组外观实验开关（纯 CSS 令牌覆盖，不侵入
-  组件代码），包括书本模式、赛博朋克、液态玻璃渲染器等
-- **评论**：访客留言 + 管理员后台（管理留言、管理员徽章、全站评论锁），
-  数据存 Cloudflare D1
+- **阅读体验**：目录侧栏（锚点高亮）、阅读进度条、上下篇导航、阅读时长估算、正文宽度可调、代码块复制按钮、表格横向滚动
+- **外观**：明暗双主题（跟随系统 + 手动切换）、亚克力面板质感、程序化文章封面（基于 slug 确定性生成）
+- **实验室**：`/lab` 页面提供一组外观实验开关（纯 CSS 令牌覆盖，不侵入组件代码），包括书本模式、赛博朋克、液态玻璃渲染器等
+- **评论**：访客留言 + 管理员后台（管理留言、管理员徽章、全站评论锁），数据存在 Cloudflare D1
 - **搜索**：构建期生成搜索索引（`/search-index.json`），顶栏可全文检索
+
+## 100% 免费
+
+本博客的完整功能可以完全免费的部署在 Cloudflare 上，使用页面构建/数据库的免费额度。
 
 ## 快速开始
 
@@ -54,13 +47,11 @@ pnpm dev
 | `pnpm test:server` | 在 Windows 上启动测试服务器（可加端口参数，如 `pnpm test:server -- 3001`） |
 | `pnpm preview:cf` | 用 wrangler 本地预览静态产物 + 评论接口 |
 
-全新克隆后先跑 `pnpm typegen` 再 `pnpm typecheck`，否则路由类型还没生成，
-typecheck 会报 `Cannot find name 'PageProps'`。
+全新克隆后先跑 `pnpm typegen` 再 `pnpm typecheck`，否则路由类型还没生成，typecheck 会报 `Cannot find name 'PageProps'`。
 
 ## 改成自己的站
 
-站名、作者、简介、域名、GitHub、导航和仓库地址全部集中在
-`src/lib/site.ts`，通常只需要改这一个文件：
+站名、作者、简介、域名、GitHub、导航和仓库地址全部集中在 `src/lib/site.ts`，通常只需要改这一个文件：
 
 ```ts
 export const siteConfig = {
@@ -73,32 +64,21 @@ export const siteConfig = {
 } as const;
 ```
 
-`LICENSE.codeUrl` 也在这个文件里，指向源码仓库。AGPL 第 13 条要求向
-网络使用者提供完整源码，页脚的「源码」链接指向仓库才算履行，部署后
-记得改成自己的仓库地址。
+`LICENSE.codeUrl` 也在这个文件里，指向源码仓库。AGPL 第 13 条要求向网络使用者提供完整源码，页脚的「源码」链接指向仓库才算履行，部署后记得改成自己的仓库地址。
 
 ### 文章内容授权
 
-框架不替你决定文章内容的授权。`src/lib/site.ts` 里 `LICENSE.content`
-默认留空：页脚和关于页不会出现内容授权条目，法律上等于保留所有权利。
-想允许转载，填入协议名和链接即可（页脚、关于页会自动显示这一条），选
-CC BY-NC-SA 4.0、CC BY 4.0 或其他你偏好的条款都行。
+框架不替你决定文章内容的授权。`src/lib/site.ts` 里 `LICENSE.content` 默认留空：页脚和关于页不会出现内容授权条目，法律上等于保留所有权利。想允许转载，填入协议名和链接即可（页脚、关于页会自动显示这一条），选 CC BY-NC-SA 4.0, CC BY 4.0 或其他你偏好的条款都行。
 
 ### 顶部站点标识
 
-顶栏左上角是纯 CSS 渲染的「圆形底 + 站名首字」，自动取
-`siteConfig.name` 的第一个字符，不依赖任何图片。想换成自己的 logo，
-把 `src/components/site-logo.tsx` 里的 `<span>` 换成图片即可（圆形裁切
-由 `globals.css` 里的 `.site-logo-badge` 负责）。
+顶栏左上角是纯 CSS 渲染的「圆形底 + 站名首字」，自动取 `siteConfig.name` 的第一个字符，不依赖任何图片。想换成自己的 logo，把 `src/components/site-logo.tsx` 里的 `<span>` 换成图片即可（圆形裁切由 `globals.css` 里的 `.site-logo-badge` 负责）。
 
-不要用 `next/image` 引用顶栏 logo：静态导出后 `/_next/image` 优化路由
-不存在，图片会静默 404。普通 `<img>` 或已开启 `unoptimized` 的导出构建
-没有这个问题。
+不要用 `next/image` 引用顶栏 logo：静态导出后 `/_next/image` 优化路由不存在，图片会静默 404。普通 `<img>` 或已开启 `unoptimized` 的导出构建没有这个问题。
 
 ## 写文章
 
-在 `src/content/` 新建 `.mdx` 文件。文件名就是文章 URL 的 slug，例如
-`my-first-post.mdx` 对应 `/blog/my-first-post`。
+在 `src/content/` 新建 `序号-标题.mdx` 文件。文件名就是文章 URL 的 slug，例如 `1-my-first-post.mdx` 对应 `/blog/1-my-first-post`。文章排序由文件名的序号决定。
 
 ```mdx
 export const metadata = {
@@ -118,13 +98,11 @@ export const metadata = {
 - `date` 必填，格式 `YYYY-MM-DD`；同一天多篇可用 `publishedAt` 精确排序。
 - `draft: true` 的文章不出现在列表和静态构建结果中。
 - 元信息用 MDX 的 `export const metadata`，不是 YAML frontmatter。
-- 不要在正文开头再写一级标题（`#`），文章页已经用 `metadata.title`
-  渲染了；目录只收录 `##` 和 `###`。
+- 不要在正文开头再写一级标题（`#`），文章页已经用 `metadata.title` 渲染了；目录只收录 `##` 和 `###`。
 - 支持 GFM 表格、任务列表、代码块和 JSX；表格自动包裹横向滚动容器。
 - 标题里的行内代码会正确生成锚点（反引号会被剥掉再算 slug）。
 - 图片放 `public/images/`，正文用绝对路径引用，`alt` 必须写。
-- 随附的 `src/content/hello-world.mdx` 是一篇覆盖常用元素的示例文章，
-  跑通后可删除。
+- 随附的 `src/content/hello-world.mdx` 是一篇覆盖常用元素的示例文章，跑通后可删除。
 
 ## 目录结构
 
@@ -144,14 +122,9 @@ public/           背景图和其他静态资源
 
 ## 主题与实验室
 
-明暗主题通过 `<html data-theme>` 驱动，`src/lib/theme.ts` 的内联脚本在
-首次绘制前写好属性，深色用户不会先看到一帧白底。
+明暗主题通过 `<html data-theme>` 驱动，`src/lib/theme.ts` 的内联脚本在首次绘制前写好属性。
 
-实验室开关通过 `<html data-labs>` 传递，配置在 `src/lib/labs.ts`，样式
-全部以 CSS 变量/选择器的形式集中在 `globals.css`，不修改组件代码。新增
-实验的路径：在 `labs.ts` 注册开关 → 在 `globals.css` 加对应令牌覆盖。
-个别实验有已知的兼容限制（如书本模式与液态玻璃同时开启时液态玻璃不
-生效；赛博朋克锁定夜间模式），说明写在 `/lab` 页面上。
+实验室开关通过 `<html data-labs>` 传递，配置在 `src/lib/labs.ts`，样式全部以 CSS 变量/选择器的形式集中在 `globals.css`，不修改组件代码。新增实验的路径：在 `labs.ts` 注册开关 → 在 `globals.css` 加对应令牌覆盖。个别实验有已知的兼容限制（如书本模式与液态玻璃同时开启时液态玻璃不生效；赛博朋克锁定夜间模式），说明写在 `/lab` 页面上。
 
 ## 部署
 
@@ -165,22 +138,15 @@ $env:NEXT_OUTPUT="export"; pnpm build
 NEXT_OUTPUT=export pnpm build
 ```
 
-本地 `pnpm dev` 不加这个变量，行为和普通 Next.js 开发一致；导出模式下
-`next/image` 优化器会被关闭，改图片相关代码后务必跑一次导出构建验证。
-仓库中的 CI 会依次执行依赖安装、类型生成、类型检查、lint、静态导出和
-产物断言，本地拿不准时以 CI 为准。
+本地 `pnpm dev` 不加这个变量，行为和普通 Next.js 开发一致；导出模式下 `next/image` 优化器会被关闭，改图片相关代码后务必跑一次导出构建验证。仓库中的 CI 会依次执行依赖安装、类型生成、类型检查、lint、静态导出和产物断言，本地拿不准时以 CI 为准。
 
 ### GitHub Pages
 
-仓库已配置 `.github/workflows/pages.yml`，推送到 `main` 后会自动构建并发布
-到 GitHub Pages。项目站点使用仓库路径 `/flowyblog-framework`，因此部署到
-自己的项目仓库时，需要同步修改 `next.config.ts` 中的 `basePath`、工作流里的
-`NEXT_PUBLIC_BASE_PATH`，以及 `src/lib/site.ts` 中的站点地址。
+仓库已配置 `.github/workflows/pages.yml`，推送到 `main` 后会自动构建并发布到 GitHub Pages。项目站点使用仓库路径 `/flowyblog-framework`，因此部署到自己的项目仓库时，需要同步修改 `next.config.ts` 中的 `basePath`、工作流里的 `NEXT_PUBLIC_BASE_PATH`，以及 `src/lib/site.ts` 中的站点地址。
 
 ### 评论与后台
 
-评论数据存 Cloudflare D1，绑定名必须是 `DB`（`functions/` 里用的就是
-`env.DB`，见 `wrangler.toml`）。全新部署：
+评论数据存 Cloudflare D1，绑定名必须是 `DB`（`functions/` 里用的就是 `env.DB`，见 `wrangler.toml`）。全新部署：
 
 ```bash
 # 1. 创建数据库并初始化表结构（数据库 ID 填回 wrangler.toml）
@@ -209,18 +175,13 @@ npx wrangler d1 execute fblog-comments --local --file=db/schema.sql
 pnpm preview:cf
 ```
 
-- 管理员登录 `/admin` 后可管理留言、给留言挂「管理员」徽标、用「接受新
-  评论」开关锁全站评论。锁的状态存在 D1 的 `settings` 表里。
+- 管理员登录 `/admin` 后可管理留言、给留言挂「管理员」徽标、用「接受新评论」开关锁全站评论。锁的状态存在 D1 的 `settings` 表里。
 - 后台入口在页脚，只有已登录的管理员能看到；登录页是 `/adminlogin`。
-- 已有旧版本数据库需要按顺序补跑 `db/migrations/` 下的迁移（本地加
-  `--local`，线上加 `--remote`），漏跑 `0003-add-settings.sql` 会让
-  评论锁显示「状态未知」。
+- 已有旧版本数据库需要按顺序补跑 `db/migrations/` 下的迁移（本地加 `--local`，线上加 `--remote`），漏跑 `0003-add-settings.sql` 会让评论锁显示「状态未知」。
 
 ## 第三方组件
 
-液态玻璃渲染器的来源、协议和对上游的改动记录在
-[src/components/liquid-glass/README.md](./src/components/liquid-glass/README.md)。
-其余依赖见 `package.json`，全部为 AGPL 兼容协议（MIT/BSD/Apache-2.0）。
+液态玻璃渲染器的来源、协议和对上游的改动记录在 [src/components/liquid-glass/README.md](./src/components/liquid-glass/README.md)。其余依赖见 `package.json`，全部为 AGPL 兼容协议（MIT/BSD/Apache-2.0）。
 
 ## 授权
 
@@ -230,8 +191,4 @@ pnpm preview:cf
 | `src/content/` 中的文章正文 | 框架不声明，由使用者自定（`src/lib/site.ts` 的 `LICENSE.content`，留空即不显示） |
 | `src/components/liquid-glass/`（第三方） | [AGPL-3.0](https://github.com/martin65536/liquid-glass-webgl) |
 
-源码可以修改和商用，但衍生作品要同样开源，并且通过网络提供服务时要把
-源码提供给使用者。代码是 AGPL 的原因：框架集成了
-[liquid-glass-webgl](https://github.com/martin65536/liquid-glass-webgl)
-（AGPL-3.0）的液态玻璃渲染器，AGPL 的源码公开义务覆盖整个服务，不能只把
-那一个组件单独标注，因此全站源码按 AGPL-3.0 发布。
+源码可以修改和商用，但衍生作品要同样开源，并且通过网络提供服务时要把源码提供给使用者。代码是 AGPL 的原因：框架集成了 [liquid-glass-webgl](https://github.com/martin65536/liquid-glass-webgl)（AGPL-3.0）的液态玻璃渲染器，AGPL 的源码公开义务覆盖整个服务，不能只把那一个组件单独标注，因此全站源码按 AGPL-3.0 发布。
