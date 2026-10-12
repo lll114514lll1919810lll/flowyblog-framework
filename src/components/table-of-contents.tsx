@@ -82,26 +82,16 @@ function buildTree(items: TocItem[]): TocNode[] {
 }
 
 /**
- * 桌面端侧栏：目录树，h3 默认折叠。
- *
- * 长文章常有几十个三级标题，全部铺开会把侧栏撑得很长、挤占正文视野，
- * 所以默认只显示二级标题，点某个二级标题才展开它的子项。
+ * 目录分组的展开状态机：桌面侧栏（Sidebar）与移动折叠版（Collapsible）
+ * 共用同一套规则，改规则时两处一起生效：
+ * - 当前正在读的章节强制展开，不受手动状态控制；
+ * - 手动展开项只记一个，切换章节时清空（上一章自动收起）；
+ * - 只有点击跳转（滚动锁开着）引起的变化才延迟收起旧章节——两段动画
+ *   同时跑会很抖；正常滚动引起的切换必须即时收起，否则高亮和展开脱节。
  */
-function Sidebar({ items }: { items: TocItem[] }) {
-  const activeId = useActiveHeading(items);
-  const tree = useMemo(() => buildTree(items), [items]);
-
-  /**
-   * 手动展开的分组（只记一个）。
-   *
-   * 展开状态分两种来源：
-   * 1. 当前正在读的章节 —— 强制展开，不受这个 state 控制
-   * 2. 用户手动点开的非当前章节 —— 记在这里
-   *
-   * 只保留一个手动项，配合「切换章节时清空」的规则，
-   * 同一时刻最多只有一个分组是展开的，目录始终紧凑。
-   */
+function useTocGroups(tree: TocNode[], activeId: string) {
   const [manualId, setManualId] = useState<string | null>(null);
+  const [closingId, setClosingId] = useState<string | null>(null);
 
   // 滚动到某个三级标题时，自动展开它所属的分组，
   // 否则高亮的条目在折叠状态下看不见，读者会困惑「高亮去哪了」。
@@ -109,27 +99,6 @@ function Sidebar({ items }: { items: TocItem[] }) {
     (n) => n.id === activeId || n.children.some((c) => c.id === activeId),
   );
   const activeGroupId = activeNode?.id ?? null;
-
-  // 侧栏自身也可能超长（展开多个分组后），需要能被滚动到可视区
-  const navRef = useRef<HTMLElement>(null);
-  // WinUI3 式滑动指示条，整棵目录只有这一条
-  const indicatorRef = useRef<HTMLSpanElement>(null);
-  // 指示条追踪状态放在 ref 里：快速连点会让下面的 effect 频繁重启，
-  // 状态跨重启保留，才不会每次都当成「首次定位」重新触发果冻拉伸
-  const indicatorPosRef = useRef<{ top: number; height: number }>({
-    top: Number.NaN,
-    height: Number.NaN,
-  });
-
-  /**
-   * 正在等待收起的旧章节。
-   *
-   * 切换章节时不能立刻把旧章节折起来：新的正在长开、旧的正在收回，
-   * 两段动画同时跑，侧栏里后面的条目会被同时推上和拉下，看起来很抖。
-   * 这里让旧章节多停留一会儿（closingId 期间仍算展开），
-   * 等新章节的展开动画跑完再真正收起。
-   */
-  const [closingId, setClosingId] = useState<string | null>(null);
 
   /**
    * 切换章节时：清掉手动展开项，并把上一章标为「待收起」。
@@ -146,14 +115,7 @@ function Sidebar({ items }: { items: TocItem[] }) {
     // 「之前章节自动收起，无视用户是否手动展开过」
     setManualId(null);
 
-    /**
-     * 只有「点击目录跳转」引起的切换才延迟收起。
-     *
-     * 正常滚动页面时章节变化必须即时响应——高亮已经跟手移到新章节了，
-     * 展开状态却慢半拍才跟上，会让人以为目录卡了。
-     *
-     * 跳转期间滚动锁是开着的（lib/scroll.ts），据此区分两种来源。
-     */
+    // 跳转期间滚动锁是开着的（lib/scroll.ts），据此区分两种变化来源
     const fromJump = getScrollLock() !== null;
 
     if (
@@ -164,7 +126,6 @@ function Sidebar({ items }: { items: TocItem[] }) {
     ) {
       setClosingId(previous);
     } else if (!fromJump) {
-      // 滚动引起的变化：立刻收起，不留待收起状态
       setClosingId(null);
     }
   }
@@ -178,6 +139,38 @@ function Sidebar({ items }: { items: TocItem[] }) {
     const timer = setTimeout(() => setClosingId(null), COLLAPSE_DELAY_MS);
     return () => clearTimeout(timer);
   }, [closingId]);
+
+  const toggle = (id: string) => {
+    // 用户主动操作这个分组时，取消它的待收起状态，
+    // 否则定时器到点会把它收掉，和用户的意图相反
+    if (closingId === id) setClosingId(null);
+    setManualId((prev) => (prev === id ? null : id));
+  };
+
+  return { activeGroupId, manualId, closingId, toggle };
+}
+
+/**
+ * 桌面端侧栏：目录树，h3 默认折叠。
+ *
+ * 长文章常有几十个三级标题，全部铺开会把侧栏撑得很长、挤占正文视野，
+ * 所以默认只显示二级标题，点某个二级标题才展开它的子项。
+ */
+function Sidebar({ items }: { items: TocItem[] }) {
+  const activeId = useActiveHeading(items);
+  const tree = useMemo(() => buildTree(items), [items]);
+  const { activeGroupId, manualId, closingId, toggle } = useTocGroups(tree, activeId);
+
+  // 侧栏自身也可能超长（展开多个分组后），需要能被滚动到可视区
+  const navRef = useRef<HTMLElement>(null);
+  // WinUI3 式滑动指示条，整棵目录只有这一条
+  const indicatorRef = useRef<HTMLSpanElement>(null);
+  // 指示条追踪状态放在 ref 里：快速连点会让下面的 effect 频繁重启，
+  // 状态跨重启保留，才不会每次都当成「首次定位」重新触发果冻拉伸
+  const indicatorPosRef = useRef<{ top: number; height: number }>({
+    top: Number.NaN,
+    height: Number.NaN,
+  });
 
   // 展开的分组也跟着高亮项走：展开后如果条目在侧栏可视区外，
   // 读者看不到自己刚展开了什么
@@ -303,13 +296,6 @@ function Sidebar({ items }: { items: TocItem[] }) {
   /** 当前章节的按钮置灰不可点：收起它也只会被强制展开，徒增困惑 */
   const isLocked = (node: TocNode) => node.id === activeGroupId;
 
-  const toggle = (id: string) => {
-    // 用户主动操作这个分组时，取消它的待收起状态，
-    // 否则定时器到点会把它收掉，和用户的意图相反
-    if (closingId === id) setClosingId(null);
-    setManualId((prev) => (prev === id ? null : id));
-  };
-
   return (
     <nav
       ref={navRef}
@@ -421,7 +407,7 @@ function Sidebar({ items }: { items: TocItem[] }) {
                 }`}
               >
                 <ul className="overflow-hidden space-y-0.5">
-                  {node.children.map((child) => (
+                  {node.children.map((child, childIndex) => (
                     <li
                       key={child.id}
                       className={`group relative transition-[opacity,transform] duration-200 ease-out ${
@@ -435,7 +421,7 @@ function Sidebar({ items }: { items: TocItem[] }) {
                         open && hasChildren
                           ? {
                               transitionDelay: `${
-                                60 + node.children.indexOf(child) * 25
+                                60 + childIndex * 25
                               }ms`,
                             }
                           : undefined
@@ -486,48 +472,9 @@ function Collapsible({ items }: { items: TocItem[] }) {
   const activeId = useActiveHeading(open ? items : []);
   const tree = useMemo(() => buildTree(items), [items]);
 
-  // 与桌面端同一套规则：当前章节强制展开，手动项只记一个，
-  // 切换章节时清空（上一章自动收起）
-  const [manualId, setManualId] = useState<string | null>(null);
-
-  const activeNode = tree.find(
-    (n) => n.id === activeId || n.children.some((c) => c.id === activeId),
-  );
-  const activeGroupId = activeNode?.id ?? null;
-
-  // 与桌面端同一套规则：章节变了就清掉手动展开项；
-  // 只有点击跳转引起的变化才延迟收起，正常滚动即时收起
-  const [closingId, setClosingId] = useState<string | null>(null);
-  const [prevActiveGroup, setPrevActiveGroup] = useState<string | null>(null);
-  if (activeGroupId !== prevActiveGroup) {
-    const previous = prevActiveGroup;
-    setPrevActiveGroup(activeGroupId);
-    setManualId(null);
-
-    const fromJump = getScrollLock() !== null;
-
-    if (
-      fromJump &&
-      previous !== null &&
-      previous !== activeGroupId &&
-      previous !== manualId
-    ) {
-      setClosingId(previous);
-    } else if (!fromJump) {
-      setClosingId(null);
-    }
-  }
-
-  useEffect(() => {
-    if (closingId === null) return;
-    const timer = setTimeout(() => setClosingId(null), COLLAPSE_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [closingId]);
-
-  const toggleGroup = (id: string) => {
-    if (closingId === id) setClosingId(null);
-    setManualId((prev) => (prev === id ? null : id));
-  };
+  // 与桌面端同一套分组展开规则（状态机在 useTocGroups，共用一份）
+  const { activeGroupId, manualId, closingId, toggle: toggleGroup } =
+    useTocGroups(tree, activeId);
 
   return (
     /* 标题行和展开内容装在同一个面板里，整块只有一圈圆角。

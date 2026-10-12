@@ -3,6 +3,8 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { pageItems } from "@/components/pagination";
+import { SearchIcon } from "@/components/search-icon";
 import type { SearchIndex } from "@/lib/search-index";
 import {
   getCachedIndex,
@@ -71,7 +73,23 @@ export function SearchPage() {
     [query],
   );
 
+  // 输入路径的 URL 写入做 300ms 防抖（结果筛选本身不走 URL，是即时的）：
+  // 快速打字时每次击键都 router.replace 会让 history/路由状态高频抖动
+  const urlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (urlTimer.current) clearTimeout(urlTimer.current);
+    },
+    [],
+  );
+
   const syncUrl = (q: string, t: string) => {
+    // 取消尚未触发的防抖写入：点「清空」或切标签后，先前那次击键的
+    // 旧查询词不能再迟到地覆盖回 URL
+    if (urlTimer.current) {
+      clearTimeout(urlTimer.current);
+      urlTimer.current = null;
+    }
     const usp = new URLSearchParams();
     if (q) usp.set("q", q);
     if (t) usp.set("tag", t);
@@ -79,6 +97,11 @@ export function SearchPage() {
     const next = usp.size ? `/search?${usp}` : "/search";
     const current = `${window.location.pathname}${window.location.search}`;
     if (next !== current) router.replace(next);
+  };
+
+  const syncUrlSoon = (q: string, t: string) => {
+    if (urlTimer.current) clearTimeout(urlTimer.current);
+    urlTimer.current = setTimeout(() => syncUrl(q, t), 300);
   };
 
   const { rows, fuzzy } = useMemo(
@@ -121,20 +144,12 @@ export function SearchPage() {
     return [...map.values()];
   }, [pagedRows]);
 
-  /* 页码按钮序列：总页数少就全列出来；多则只开当前页附近的一个窗口 */
-  const pageButtons = useMemo<(number | "…")[]>(() => {
-    if (totalPages <= 7) {
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
-    const nums: (number | "…")[] = [1];
-    if (page > 3) nums.push("…");
-    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) {
-      nums.push(i);
-    }
-    if (page < totalPages - 2) nums.push("…");
-    nums.push(totalPages);
-    return nums;
-  }, [page, totalPages]);
+  /* 页码按钮序列：窗口算法与文章分页共用一份（pagination.tsx 的 pageItems），
+     null 渲染成「…」，两处省略号的出现时机保持一致 */
+  const pageButtons = useMemo(
+    () => pageItems(page, totalPages).map((n) => n ?? ("…" as const)),
+    [page, totalPages],
+  );
 
   /* 标签筛选 chips：索引里出现过的标签，按文章数降序 */
   const tagCounts = useMemo(() => {
@@ -154,29 +169,14 @@ export function SearchPage() {
         <p className="eyebrow">SEARCH</p>
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">搜索</h1>
         <div className="search-page-bar">
-          <svg
-            className="search-page-bar-icon"
-            width="16"
-            height="16"
-            viewBox="0 0 18 18"
-            fill="none"
-            aria-hidden
-          >
-            <circle cx="8" cy="8" r="5.2" stroke="currentColor" strokeWidth="1.6" />
-            <path
-              d="M12 12l3.4 3.4"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-            />
-          </svg>
+          <SearchIcon className="search-page-bar-icon" />
           <input
             ref={inputRef}
             type="search"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
-              syncUrl(event.target.value.trim(), tag);
+              syncUrlSoon(event.target.value.trim(), tag);
             }}
             placeholder="输入关键词搜索文章…"
             aria-label="搜索文章"

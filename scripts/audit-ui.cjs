@@ -328,7 +328,7 @@ async function auditAnimations(send) {
      会得到一连串假失败。这里先量 300ms 内有多少帧，
      低于阈值就让报告把这节标成「数据不可信」，而不是当成代码问题。
    */
-  await goto(send, `${BASE}/blog/nextjs-16-breaking-changes`, 1280, 900);
+  await goto(send, `${BASE}/blog/10-hello-world`, 1280, 900);
   out.frameTicks = await evaluate(
     send,
     `
@@ -481,7 +481,7 @@ async function auditAnimations(send) {
   };
 
   // 5. 移动端折叠目录：点击后是否展开
-  await goto(send, `${BASE}/blog/nextjs-16-breaking-changes`, 390, 844);
+  await goto(send, `${BASE}/blog/10-hello-world`, 390, 844);
 
   /*
      不能用「可见链接数量」判断展开：面板收起靠的是 grid-template-rows: 0fr
@@ -529,11 +529,17 @@ async function auditAnimations(send) {
 
 /* ---------------------------------------------------------------- 主流程 --- */
 
+/*
+  硬编码的示例文章 slug。这里的取舍：audit 考察的是「页面在三种视口下的
+  布局/交互」，指向固定文章比动态挑最新一篇结果更可比（布局不受内容变化
+  干扰）；但文章改名/删除后要同步更新这里的路径，否则会静默审计 404 页。
+  「短文章」必须是内容最短的那篇，用来考察长面板不撑爆小视口的情形。
+*/
 const PAGES = [
   { name: '首页', path: '/' },
   { name: '文章列表', path: '/blog' },
   { name: '文章详情', path: '/blog/10-hello-world' },
-  { name: '短文章', path: '/blog/10-hello-world' },
+  { name: '短文章', path: '/blog/2-same-day-order-earlier' },
   { name: '标签', path: '/tags' },
   { name: '关于', path: '/about' },
 ];

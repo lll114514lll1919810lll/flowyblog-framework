@@ -54,6 +54,21 @@ export function repoSlugFromUrl(url: string): string {
   }
 }
 
+/** 脏改动预检的统一告警文案（CLI 与 Web 向导共用一份，避免措辞分叉）。 */
+export const DIRTY_FILES_MESSAGE =
+  "src/lib/site.ts / wrangler.toml 存在未提交的改动，向导会直接覆盖它们（介意的话先 git stash 或提交）";
+
+/**
+ * 预检向导会覆盖的两个跟踪文件是否已有未提交改动。
+ * 返回脏文件列表（空 = 干净或不在 git 仓库里），CLI 与 Web 向导共用。
+ */
+export function dirtyOverlayFiles(ctx: SetupContext): string[] {
+  const res = ctx.run("git status --porcelain -- src/lib/site.ts wrangler.toml");
+  if (res.code !== 0) return [];
+  const out = res.stdout.trim();
+  return out ? out.split(/\r?\n/) : [];
+}
+
 /** 终端着色。非 TTY（管道 / CI / --json）时原样返回，避免转义串污染日志。 */
 export const c = {
   green: (s: string) => (process.stdout.isTTY ? `\x1b[32m${s}\x1b[0m` : s),

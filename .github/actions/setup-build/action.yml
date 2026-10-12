@@ -1,0 +1,45 @@
+name: 'Setup and build (static export)'
+description: '全新安装依赖、生成路由类型并做静态导出构建；CI 与 Pages 部署共用一份，安装/构建环节调整时只改这里。'
+
+# 复合 action 不含 checkout，调用方先自行 checkout。
+
+runs:
+  using: 'composite'
+  steps:
+    # 版本要和 package.json 的 packageManager 保持一致，
+    # 否则 pnpm 会因为两者不匹配而直接报错退出
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 12.6.0
+        run_install: false
+
+    - uses: actions/setup-node@v4
+      with:
+        # 对齐 Cloudflare 构建镜像使用的 Node 版本
+        node-version: 22
+        cache: pnpm
+
+    # --frozen-lockfile：锁文件与 package.json 不一致时直接失败，
+    # 避免 CI 上悄悄改动依赖树、掩盖本地漏提交的变更
+    - name: 安装依赖
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    # 必须先跑 typegen，否则 typecheck 必然失败。
+    #
+    # Next.js 把 PageProps / LayoutProps 这类路由类型生成到 .next/types/，
+    # 再通过 next-env.d.ts 引入。而 next-env.d.ts 在 .gitignore 里
+    # （它是自动生成物），全新克隆的仓库根本没有这个文件，
+    # tsc 会报一堆 "Cannot find name 'PageProps'"。
+    #
+    # 本地看不出来是因为跑过 pnpm dev / pnpm build，生成物还在。
+    - name: 生成路由类型
+      shell: bash
+      run: pnpm typegen
+
+    # 必须带 NEXT_OUTPUT=export，否则测的是本地构建路径，
+    # 而不是真实上线的那条路径。
+    # basePath 按仓库名自动派生：fork 或改名后无需改任何文件。
+    - name: 静态导出构建
+      shell: bash
+      run: NEXT_OUTPUT=export GITHUB_PAGES=true NEXT_PUBLIC_BASE_PATH=/${{ github.event.repository.name }} pnpm build

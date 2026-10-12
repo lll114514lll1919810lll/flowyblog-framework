@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { scrollToTop } from "@/lib/scroll";
+import { useRafScroll } from "@/components/use-raf-scroll";
 
 /**
  * 回到顶部按钮。
@@ -23,14 +24,15 @@ import { scrollToTop } from "@/lib/scroll";
 export function BackToTop() {
   const [visible, setVisible] = useState(false);
   const [lift, setLift] = useState(0);
+  // 查到的元素缓存在 ref 里：回调每次渲染都会重建，
+  // 原来靠 effect 闭包保留的缓存得换成 ref 才能跨回调存活
+  const postRef = useRef<HTMLElement | null>(null);
+  const footerRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
-    let frame = 0;
-    let footer: HTMLElement | null = null;
-    let post: HTMLElement | null = null;
-
-    const update = () => {
-      frame = 0;
+  // 滚动跟随（rAF 节流）走共享 hook；挂载时先算一次，
+  // 避免刷新落到页面中部时按钮状态错一拍
+  useRafScroll(
+    () => {
       /*
         出现时机按**文章的顶边**算，不用滚动了多少像素。
 
@@ -38,7 +40,8 @@ export function BackToTop() {
         0.8 屏时文章才刚露头，按钮就已经压在正文上了——看起来像刚进页面
         就冒出来。按文章的顶边走，语义才是「你已经在正文里了」。
       */
-      post = post ?? document.querySelector("article");
+      postRef.current ??= document.querySelector("article");
+      const post = postRef.current;
       setVisible(
         post
           ? post.getBoundingClientRect().top <= 0
@@ -46,29 +49,16 @@ export function BackToTop() {
             window.scrollY > window.innerHeight * 0.8,
       );
 
-      footer = footer ?? document.querySelector("footer");
+      footerRef.current ??= document.querySelector("footer");
+      const footer = footerRef.current;
       if (!footer) return;
       // 页脚顶边一旦进入视口，就开始把按钮往上顶
       const overlap = window.innerHeight - footer.getBoundingClientRect().top;
       // 上限是别把自己顶出屏幕顶部
       setLift(Math.max(0, Math.min(overlap, window.innerHeight - 160)));
-    };
-
-    // rAF 节流：滚动事件触发极频繁，直接 setState 会掉帧
-    const onScroll = () => {
-      if (frame === 0) frame = requestAnimationFrame(update);
-    };
-
-    update();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
-
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, []);
+    },
+    { resize: true, immediate: true },
+  );
 
   return (
     <button

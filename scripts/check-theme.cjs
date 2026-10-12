@@ -495,8 +495,11 @@ async function installFirstPaintRecorder(send) {
       (failed.length ? `，失败：${failed.map((f) => f.name).join('、')}` : ''),
   );
   ws.close();
-  process.exit(failed.length ? 1 : 0);
+  // 用 exitCode 而不是 process.exit：本脚本先 fetch 过 CDP（keep-alive 连接
+  // 未关），Windows 上立即 process.exit 会触发 undici 的 UV_HANDLE_CLOSING
+  // 断言崩溃——同一个坑 test-toc.ts 里已经记录并绕过过，这里保持一致
+  process.exitCode = failed.length ? 1 : 0;
 })().catch((e) => {
   console.error('脚本出错：', e);
-  process.exit(2);
+  process.exitCode = 2;
 });

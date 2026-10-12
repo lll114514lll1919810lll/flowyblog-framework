@@ -7,10 +7,12 @@
  * 全站评论锁（后台 /admin 可拨）打开时，GET 照常返回列表、只多带一个
  * locked 标记，POST 一律 403。已有留言仍然可读——锁的是「不接受新评论」，
  * 不是把评论区整块藏起来。
- *   DELETE /api/comments?id=<id>&key=<ADMIN_KEY>             管理员删除（级联删回复）
+ *
+ * 管理员删除留言走 /api/admin/comments（登录态鉴权），本接口不暴露
+ * 任何管理通道——管理密钥出现在 URL 里有日志泄漏风险。
  *
  * 设计取舍：
- * - 不做登录。个人博客的评论用「匿名 + 昵称 + 限流 + 管理密钥」就够了，
+ * - 不做登录。个人博客的评论用「匿名 + 昵称 + 限流」就够了，
  *   引入账号体系会让九成想留言的人直接放弃。
  * - 昵称可选，留空记作「路人」。
  * - 只存 IP 的哈希，不存原始 IP（见 _lib/api.js 的 ipHashOf）。
@@ -18,11 +20,9 @@
  */
 
 import {
-  adminAuthorized,
   commentsLocked,
   countRecent,
   createHandlers,
-  deleteCommentCascade,
   ipHashOf,
   json,
   LIST_LIMIT,
@@ -122,6 +122,10 @@ async function handle(request, env, url) {
     }
 
     const ipHash = await ipHashOf(request, env);
+    if (!ipHash) {
+      // 没盐就没法算不可逆哈希，宁可拒绝发表也不退回公开默认盐
+      return json({ error: "服务端未配置 IP_SALT，暂时无法发表评论" }, 503, origin);
+    }
 
     const recent = await countRecent(env.DB, TABLE, ipHash, RATE_WINDOW_MIN);
     if (recent >= RATE_LIMIT) {
@@ -142,25 +146,8 @@ async function handle(request, env, url) {
     return json({ ok: true }, 200, origin);
   }
 
-  /* ------------------------------------------------------------ 删除 --- */
-  if (request.method === "DELETE") {
-    if (!adminAuthorized(url, request, env)) {
-      return json({ error: "无权操作" }, 403, origin);
-    }
-
-    const id = Number(url.searchParams.get("id"));
-    if (!Number.isInteger(id) || id <= 0) {
-      return json({ error: "id 不合法" }, 400, origin);
-    }
-
-    const removed = await deleteCommentCascade(env.DB, TABLE, id);
-    if (!removed) return json({ error: "留言不存在" }, 404, origin);
-
-    return json({ ok: true, removed }, 200, origin);
-  }
-
   return json({ error: "不支持的请求方法" }, 405, origin);
 }
 
-export const { onRequestGet, onRequestPost, onRequestDelete, onRequestOptions } =
+export const { onRequestGet, onRequestPost, onRequestOptions } =
   createHandlers(handle);

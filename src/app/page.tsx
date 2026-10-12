@@ -8,7 +8,8 @@ export default function HomePage() {
   const featured = posts[0];
   // 5 篇 + 「查看全部」入口正好填满 3 列的两行：4 篇时网格右下角空一格
   const latest = posts.slice(1, 6);
-  const totalWords = posts.reduce((sum, p) => sum + (p.readingTime ?? 0), 0);
+  // 统计的是全部文章的阅读时长之和（分钟），不是字数
+  const totalReadingMinutes = posts.reduce((sum, p) => sum + (p.readingTime ?? 0), 0);
   const tags = [...new Set(posts.flatMap((post) => post.tags ?? []))].slice(0, 5);
 
   return (
@@ -104,7 +105,7 @@ export default function HomePage() {
               <span className="text-xs text-muted">篇文章</span>
             </div>
             <div>
-              <strong className="block text-2xl tracking-tight">{totalWords}</strong>
+              <strong className="block text-2xl tracking-tight">{totalReadingMinutes}</strong>
               <span className="text-xs text-muted">分钟阅读</span>
             </div>
           </div>
@@ -126,7 +127,9 @@ export default function HomePage() {
             <p className="eyebrow">RECENT UPDATES</p>
             <h2 className="mt-1 text-2xl font-semibold tracking-tight">最近更新</h2>
           </div>
-          <span className="text-sm text-muted">{posts.length - 1} 篇</span>
+          {/* 这一栏跳过置顶的 featured，所以是总数减一；0/1 篇时夹回 0，
+              别显示出「-1 篇」这种怪话 */}
+          <span className="text-sm text-muted">{Math.max(posts.length - 1, 0)} 篇</span>
         </div>
         {/* 手机 1 列 / 平板 2 列 / 电脑 3 列，与文章列表页保持一致 */}
         {latest.length > 0 ? (

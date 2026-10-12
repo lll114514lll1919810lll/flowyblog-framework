@@ -1,41 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useRafScroll } from "@/components/use-raf-scroll";
 
 /**
  * 阅读进度条：顶部一条 1.5px 的细线，宽度 = 已读百分比。
  *
- * 用 rAF 节流，避免滚动事件高频触发造成掉帧；
- * 页面只有一个进度条，开销可以忽略。
+ * rAF 节流在共享的 useRafScroll 里，页面只有一个进度条，开销可以忽略。
  */
 export function ReadingProgress() {
   const [progress, setProgress] = useState(0);
 
-  useEffect(() => {
-    let frame = 0;
-
-    const update = () => {
-      frame = 0;
+  useRafScroll(
+    () => {
       const scrollTop = window.scrollY;
       const scrollable = document.documentElement.scrollHeight - window.innerHeight;
 
       setProgress(scrollable > 0 ? Math.min(1, Math.max(0, scrollTop / scrollable)) : 0);
-    };
-
-    const onScroll = () => {
-      if (frame === 0) frame = requestAnimationFrame(update);
-    };
-
-    update();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
-
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, []);
+    },
+    { resize: true, immediate: true },
+  );
 
   return (
     <div

@@ -22,6 +22,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   DEFAULT_PROJECT_NAME,
+  DIRTY_FILES_MESSAGE,
+  dirtyOverlayFiles,
   loadState,
   makeContext,
   projectName,
@@ -82,7 +84,15 @@ async function probeAll(): Promise<Record<string, { status: string; detail?: str
 }
 
 async function runFlow(options: { answers: Record<string, string>; only?: string }): Promise<void> {
-  running = true;
+  // running 已由 /api/run 在检查后同步置位（见路由处注释），这里只负责收尾
+  try {
+    await doRunFlow(options);
+  } finally {
+    running = false;
+  }
+}
+
+async function doRunFlow(options: { answers: Record<string, string>; only?: string }): Promise<void> {
   state = loadState(root);
   // 表单答案合并进持久状态：既是本次运行的预填值，也是下次的默认值
   state.answers = { ...state.answers, ...options.answers };
@@ -109,13 +119,10 @@ async function runFlow(options: { answers: Record<string, string>; only?: string
   emit("setup-start", { steps: STEPS.map((s) => s.id), only: options.only ?? null });
 
   // 预检：向导会覆盖的两个跟踪文件若已有未提交改动，先明示出来
-  const dirty = ctx.run("git status --porcelain -- src/lib/site.ts wrangler.toml");
-  if (dirty.code === 0 && dirty.stdout.trim()) {
-    emit("warn-dirty", { files: dirty.stdout.trim().split(/\r?\n/) });
-    emit("warn", {
-      message:
-        "src/lib/site.ts / wrangler.toml 存在未提交的改动，向导会直接覆盖它们（介意的话先 git stash 或提交）",
-    });
+  const dirty = dirtyOverlayFiles(ctx);
+  if (dirty.length > 0) {
+    emit("warn-dirty", { files: dirty });
+    emit("warn", { message: DIRTY_FILES_MESSAGE });
   }
 
   let ok = true;
@@ -144,7 +151,6 @@ async function runFlow(options: { answers: Record<string, string>; only?: string
     }
   }
   emit("setup-end", { ok });
-  running = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -209,15 +215,25 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/run") {
+      // 检查与置位之间绝不能有 await：置位若推迟到 runFlow 内部，
+      // 两个并发请求都会通过检查、各自启动一条完整安装流，
+      // 并发改写 site.ts / wrangler.toml / state.json。
       if (running) {
         res.writeHead(409);
         res.end("已有任务在运行");
         return;
       }
-      const body = JSON.parse((await readBody(req)) || "{}") as {
-        answers?: Record<string, string>;
-        only?: string;
-      };
+      running = true;
+      let body: { answers?: Record<string, string>; only?: string };
+      try {
+        body = JSON.parse((await readBody(req)) || "{}") as {
+          answers?: Record<string, string>;
+          only?: string;
+        };
+      } catch (error) {
+        running = false; // 请求体解析失败也要释放，否则向导永久卡在「运行中」
+        throw error;
+      }
       void runFlow({ answers: body.answers ?? {}, only: body.only });
       res.writeHead(202, { "content-type": "application/json; charset=utf-8" });
       res.end('{"accepted":true}');
@@ -297,7 +313,8 @@ function stepPanels(): string {
     {
       id: "deploy",
       desc:
-        "<p>最后一步：静态导出构建（一两分钟）→ 上传到 Cloudflare Pages → 同步线上环境变量。" +
+        "<p>最后一步：静态导出构建（一两分钟）→ 写入线上环境变量 → 上传到 Cloudflare Pages。" +
+        "环境变量先于上传写入——Pages 按部署快照注入变量，顺序反了首个部署就拿不到密钥。" +
         "完成后博客地址形如 <code>https://&lt;项目名&gt;.pages.dev</code>。" +
         "以后写了新文章，回到这一步重新运行即可重新发布。</p>" +
         "<p>如果这个文件夹不是 git 仓库（比如直接下载的源码包），部署照样能用，" +
@@ -631,7 +648,7 @@ li.running { border-color: var(--brand); }
     var b = document.getElementById("banner");
     b.style.display = "block";
     b.innerHTML = "博客已上线：<a href='" + url + "' target='_blank' rel='noreferrer'>" + url + "</a>" +
-      "（首次部署后评论环境变量可能需要几十秒生效）";
+      "（评论环境变量已随本次部署一起生效；评论区没出现的话等几十秒刷新）";
   }
 
   function collectAnswers() {

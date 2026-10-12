@@ -20,25 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 12.6.0
-          run_install: false
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: 安装依赖
-        run: pnpm install --frozen-lockfile
-
-      - name: 生成路由类型
-        run: pnpm typegen
-
-      # basePath 按仓库名自动派生：fork 或改名后无需改任何文件
-      - name: 构建静态站点
-        run: NEXT_OUTPUT=export GITHUB_PAGES=true NEXT_PUBLIC_BASE_PATH=/${{ github.event.repository.name }} pnpm build
+      # 安装 / typegen / 静态导出构建与 ci.yml 共用一份（见 action.yml）
+      - uses: ./.github/actions/setup-build
 
       - name: 上传 Pages 产物
         uses: actions/upload-pages-artifact@v3

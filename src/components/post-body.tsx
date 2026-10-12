@@ -172,8 +172,10 @@ function WidthControl({
         type="button"
         onClick={onAdvance}
         title={`当前「${label}」${size ? `，${size}` : ""}。点击切换为「${nextLabel}」`}
-        className="reading-width-current"
+        className="reading-width-current group"
       >
+        {/* group 标记让箭头的 group-hover:translate-x 生效：
+            悬停按钮时箭头轻微右移，暗示「点击有下一步」 */}
         <span>{label}</span>
         <svg
           width="10"

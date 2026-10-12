@@ -40,12 +40,12 @@ export async function onRequestPost({ request, env }) {
   }
 
   // 密钥过短直接拒绝：引导站主设一个真正安全的密钥，
-  // 而不是让一个 6 位密码守着整个后台
+  // 而不是让一个 6 位密码守着整个后台。
+  // 提示里不写当前实际长度——这个响应任何未认证的人都能触发，
+  // 泄漏长度等于帮暴力破解省一半工作量。
   if (expected.length < MIN_KEY_LENGTH) {
     return adminJson(
-      {
-        error: `ADMIN_KEY 太短（当前 ${expected.length} 位），请设置为至少 ${MIN_KEY_LENGTH} 位`,
-      },
+      { error: `ADMIN_KEY 太短，请设置为至少 ${MIN_KEY_LENGTH} 位` },
       503,
     );
   }

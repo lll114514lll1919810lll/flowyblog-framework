@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { navLinks } from "@/lib/site";
 import { LinkPending } from "@/components/link-pending";
+import { useClickOutside } from "@/components/use-click-outside";
 
 /**
  * 窄屏的导航菜单。
@@ -22,16 +23,10 @@ import { LinkPending } from "@/components/link-pending";
 export function MobileNav() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
 
-  /* 点面板和按钮之外关闭 */
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open]);
+  /* 点面板和按钮之外关闭（共享 hook，见 use-click-outside.ts） */
+  useClickOutside(rootRef, open, close);
 
   /* Esc 关闭 */
   useEffect(() => {

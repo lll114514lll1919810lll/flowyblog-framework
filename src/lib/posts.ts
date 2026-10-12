@@ -15,6 +15,9 @@ import { withAssetVersion } from "@/lib/asset-version";
 
 const POSTS_DIR = path.join(process.cwd(), "src/content");
 
+/** 构建期内全量文章只读一次磁盘：列表/标签/归档/sitemap 都会反复调用 getAllPosts */
+let postsCache: Post[] | null = null;
+
 export type PostMetadata = {
   title: string;
   date: string; // YYYY-MM-DD
@@ -37,6 +40,7 @@ function isPostFile(fileName: string): boolean {
 
 /** 取出目录下所有文章的元信息，按日期倒序（最新在前）。 */
 export function getAllPosts(): Post[] {
+  if (postsCache) return postsCache;
   if (!fs.existsSync(POSTS_DIR)) return [];
 
   const files = fs.readdirSync(POSTS_DIR).filter(isPostFile);
@@ -51,7 +55,7 @@ export function getAllPosts(): Post[] {
     };
   });
 
-  return posts
+  postsCache = posts
     .filter((post) => !post.draft)
     .sort((a, b) => {
       const byPublishedAt = (b.publishedAt ?? b.date).localeCompare(
@@ -59,6 +63,7 @@ export function getAllPosts(): Post[] {
       );
       return byPublishedAt || a.slug.localeCompare(b.slug);
     });
+  return postsCache;
 }
 
 /** 根据 slug 取单篇文章的元信息；找不到返回 null。 */
@@ -83,11 +88,39 @@ export type TocItem = {
 };
 
 /**
+ * 去掉 LaTeX 公式源码（$...$ 行内、$$...$$ 块级）。
+ *
+ * 目录和搜索索引都从 MDX 源码提取标题，而标题会被 remark-math 渲染成公式：
+ * 不去掉公式源码的话，两处算出的锚点都和渲染结果对不上，跳转会失效。
+ * 两边必须共用同一份实现（见 getTableOfContents / buildSearchIndex）。
+ *
+ * 顺序有讲究，不能乱：
+ * 1. 正文里的字面美元按书写规范写成 \$（见 10-latex.mdx 的说明），
+ *    先换成占位符保护起来，否则第 3 步会把它当成公式定界符、
+ *    把货币金额之类的文本一并吃掉；
+ * 2. 成对的 $$...$$ 整块换掉（[\s\S] 让它可以跨行）；
+ * 3. 未闭合的 $$ 删掉至文末（书写错误时的兜底）；
+ * 4. 剩下的成对 $...$ 换掉；
+ * 5. 占位符还原成 $。
+ */
+export function stripMath(text: string): string {
+  // 不可能出现在正文里的标记串做占位符
+  const PLACEHOLDER = "__FLOWYBLOG_DOLLAR__";
+  return text
+    .replace(/\\\$/g, PLACEHOLDER)
+    .replace(/\$\$[\s\S]*?\$\$/g, " ")
+    .replace(/\$\$[\s\S]*$/, " ")
+    .replace(/\$[^$\n]+?\$/g, " ")
+    .replaceAll(PLACEHOLDER, "$");
+}
+
+/**
  * 从 MDX 源码里提取目录。
  *
  * 关键点：锚点 id 必须和 rehype-slug 实际渲染出来的 id 一致，否则点击跳转失效。
  * rehype-slug 内部用的就是 github-slugger，所以这里也用同一个库、
  * 同一个实例顺序（同一个 slugger 连续调用才能正确处理重复标题的 -1、-2 后缀）。
+ * 标题清洗与公式块跳过规则和 search-index.ts 的锚点提取保持同一份（见 stripMath）。
  */
 export function getTableOfContents(slug: string): TocItem[] {
   const filePath = path.join(POSTS_DIR, `${slug}.mdx`);
@@ -97,25 +130,33 @@ export function getTableOfContents(slug: string): TocItem[] {
   const slugger = new GithubSlugger();
   const items: TocItem[] = [];
 
-  // 逐行匹配 Markdown 标题，跳过代码块内部（``` 之间的 # 不是标题）
+  // 逐行匹配 Markdown 标题，跳过代码块和公式块内部（``` 之间的 # 不是标题，
+  // $$ 块里的内容也不会渲染成标题）
   let inCodeBlock = false;
+  let inMathBlock = false;
   for (const line of source.split("\n")) {
     if (/^\s*```/.test(line)) {
       inCodeBlock = !inCodeBlock;
       continue;
     }
     if (inCodeBlock) continue;
+    if (/^\s*\$\$\s*$/.test(line)) {
+      inMathBlock = !inMathBlock;
+      continue;
+    }
+    if (inMathBlock) continue;
 
     const match = /^(#{2,3})\s+(.+?)\s*#*$/.exec(line);
     if (!match) continue;
 
     const depth = match[1].length as 2 | 3;
-    const text = match[2]
-      // 去掉行内代码和链接语法，只留纯文本
-      .replace(/`([^`]*)`/g, "$1")
-      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-      .replace(/[*_~]/g, "")
-      .trim();
+    const text = stripMath(
+      match[2]
+        // 去掉行内代码和链接语法，只留纯文本
+        .replace(/`([^`]*)`/g, "$1")
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+        .replace(/[*_~]/g, ""),
+    ).trim();
 
     if (text) items.push({ id: slugger.slug(text), text, depth });
   }
@@ -143,8 +184,7 @@ export function getReadingTime(source: string): number {
   return Math.max(1, Math.round(cjk / 400 + words / 200));
 }
 
-/** 所有标签及其文章数，按文章数从多到少。 */
-/** 标签及其文章数 */
+/** 标签及其文章数，按文章数从多到少。 */
 export type TagCount = { tag: string; count: number };
 
 export function getAllTags(): TagCount[] {
@@ -212,7 +252,8 @@ export type PagedPosts = {
 };
 
 /**
- * 取某一页的文章。页码超出范围时返回空列表，不抛——页面那边自己给空状态。
+ * 取某一页的文章。页码超出范围时夹回合法范围（永远返回某一页），不抛——
+ * 超范围 URL 的 404 由分页路由自己把关。
  *
  * 页码从 1 开始而不是 0：它会出现在 URL 和「第 N 页」的文案里，
  * /blog/1 比 /blog/0 自然。
@@ -249,31 +290,60 @@ export function formatMonthLabel(month: string): string {
 }
 
 /**
- * 从 MDX 源码里提取 `export const metadata = { ... }` 的内容。
+ * 从 MDX 源码里定位 `export const metadata = { ... }` 的对象体（含两端花括号）。
+ * 没有 metadata 或括号未闭合时返回 null。
  *
- * 这里用正则做一次轻量解析，而不是真的去执行/导入 MDX——因为列表页只需要元信息，
+ * 用括号配对而不是「匹配到行首的 }」：单行写法、值里带花括号、嵌套的
+ * 数组/对象都能正确处理。字符串字面量（单引号/双引号/模板串）里的括号
+ * 不参与配对。posts.ts（解析元信息）和 search-index.ts（跳过 metadata 块）
+ * 共用这一份实现，避免各自的跳过规则漂移。
+ */
+export function extractMetadataBlock(source: string): string | null {
+  const decl = /export\s+const\s+metadata\b/.exec(source);
+  if (!decl) return null;
+  const open = source.indexOf("{", decl.index + decl[0].length);
+  if (open === -1) return null;
+
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = open; i < source.length; i++) {
+    const ch = source[i];
+    if (quote) {
+      if (ch === "\\") i++; // 跳过转义字符
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === "`") quote = ch;
+    else if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return source.slice(open, i + 1);
+    }
+  }
+  return null;
+}
+
+/**
+ * 从 MDX 源码里读取 `export const metadata = { ... }`。
+ *
+ * 这里做轻量解析而不是真的去执行/导入 MDX——因为列表页只需要元信息，
  * 不需要渲染正文。执行 MDX 会把整篇文章都编译进构建产物，代价高且没必要。
  * 只解析元信息 + 真正渲染正文时才 import，两者职责分开。
  */
 function parseMetadata(source: string): PostMetadata {
-  const match = source.match(
-    /export\s+const\s+metadata\s*(?::[^=]+)?=\s*(\{[\s\S]*?\n\})\s*;?/,
-  );
+  const block = extractMetadataBlock(source);
 
-  if (!match) {
+  if (!block) {
     // 兜底：即使作者忘了写 metadata，也不要让整个列表页崩掉
     return { title: "未命名文章", date: "1970-01-01" };
   }
 
-  // 把对象字面量转成可执行代码来读取，只接受字符串/数字/数组/布尔
-  const jsonLike = match[1]
-    // 单引号 → 双引号
-    .replace(/'/g, '"')
-    // 去掉属性名和字符串值之外的尾逗号
-    .replace(/,(\s*[}\]])/g, "$1");
-
+  // 对象字面量本身就是合法的 JS 表达式：单引号、值里的撇号（"won't"）、
+  // 尾逗号、嵌套结构都交给 JS 引擎处理。不要做字符串预清洗——早期版本
+  // 的 .replace(/'/g, '"') 会把双引号值里的撇号替换坏，解析失败后整篇
+  // 文章静默落到「未命名文章 / 1970-01-01」。
   try {
-    const value = new Function(`return ${jsonLike}`)() as PostMetadata;
+    const value = new Function(`return (${block})`)() as PostMetadata;
     return {
       title: value.title ?? "未命名文章",
       date: value.date ?? "1970-01-01",

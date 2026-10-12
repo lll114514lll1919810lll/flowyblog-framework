@@ -139,13 +139,17 @@ export function validateComment({ page, name, text }) {
  * 限流只需要「同一个 IP 能对上」，不需要知道 IP 是谁，所以存哈希就够了——
  * 数据库里不该留下访客的真实 IP。加盐（IP_SALT）是防止有人拿常见 IP 段
  * 反查哈希表。
+ *
+ * IP_SALT 未配置时返回 null，由调用方决定拒绝服务——绝不回退到写死在
+ * 公开仓库里的默认盐：那等于没加，所有部署的哈希都能被同一张彩虹表反查。
  */
 export async function ipHashOf(request, env) {
   const ip =
     request.headers.get("CF-Connecting-IP") ||
     (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() ||
     "unknown";
-  const salt = String((env && env.IP_SALT) || "fbz-blog-comments");
+  const salt = env && env.IP_SALT ? String(env.IP_SALT) : "";
+  if (!salt) return null;
   const digest = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(`${salt}:${ip}`),
@@ -195,22 +199,17 @@ export async function resolveReplyTarget(db, table, page, parentId) {
 /**
  * 删除一条留言；如果它是顶层留言，连同它下面所有回复一起删。
  *
- * 必须**先删子行再删父行**：反过来父行没了，子行的 parent_id 就指向一个
- * 不存在的 id，那些回复会变成永远显示不出来的孤儿数据。
+ * 两条 DELETE 用 db.batch 放进同一个事务：要么全部生效要么全部回滚，
+ * 不会出现「回复删了、父留言还在」的半删状态。batch 内语句按序执行，
+ * 先删子行后删父行的顺序保持不变。
  *
  * 返回实际删掉的条数（含回复），调用方据此判断「是不是本来就不存在」。
  */
 export async function deleteCommentCascade(db, table, id) {
-  const children = await db
-    .prepare(`DELETE FROM ${table} WHERE parent_id = ?1`)
-    .bind(id)
-    .run();
-
-  const self = await db
-    .prepare(`DELETE FROM ${table} WHERE id = ?1`)
-    .bind(id)
-    .run();
-
+  const [children, self] = await db.batch([
+    db.prepare(`DELETE FROM ${table} WHERE parent_id = ?1`).bind(id),
+    db.prepare(`DELETE FROM ${table} WHERE id = ?1`).bind(id),
+  ]);
   return (children.meta?.changes ?? 0) + (self.meta?.changes ?? 0);
 }
 
@@ -269,27 +268,10 @@ export async function setCommentsLocked(db, locked) {
 
 /* --------------------------------------------------------------- 管理 --- */
 
-/**
- * 管理员校验。密钥从环境变量 ADMIN_KEY 读，前端不持有。
- *
- * 比较用逐字节异或累加而不是 === ：字符串比较会在第一个不同的字符处
- * 提前返回，理论上能通过响应时间差逐位猜出密钥（时序侧信道）。
- */
-export function adminAuthorized(url, request, env) {
-  const expected = String((env && env.ADMIN_KEY) || "");
-  if (!expected) return false;
-
-  const provided = String(
-    url.searchParams.get("key") || request.headers.get("x-admin-key") || "",
-  );
-  if (provided.length !== expected.length) return false;
-
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) {
-    diff |= provided.charCodeAt(i) ^ expected.charCodeAt(i);
-  }
-  return diff === 0;
-}
+/* 管理接口一律走 /api/admin/* 的登录态（签名 Cookie）鉴权。
+   早期版本在 /api/comments 上留过一条「带管理密钥直接删」的通道
+   （?key= 查询参数 / x-admin-key 头），URL 里的密钥会落入访问日志、
+   代理日志和浏览器历史，属于不必要的泄漏面，已整体移除。 */
 
 /* ------------------------------------------------------------- 会话 --- */
 
@@ -317,14 +299,20 @@ function sessionSecret(env) {
   return String((env && (env.SESSION_SECRET || env.ADMIN_KEY)) || "");
 }
 
-/** 常量时间字符串比较，避免时序侧信道 */
+/**
+ * 常量时间字符串比较，避免时序侧信道。
+ *
+ * 遍历长度取两者较大值、越界位置按 0 参与异或：即使长度不同也走完全程，
+ * 长度差本身也不会在耗时上体现出来。
+ */
 export function timingSafeEqual(a, b) {
   const x = String(a);
   const y = String(b);
-  // 长度不同直接返回，但先走一遍等长累加，避免长度差异被计时区分
-  if (x.length !== y.length) return false;
-  let diff = 0;
-  for (let i = 0; i < x.length; i++) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
+  let diff = x.length ^ y.length;
+  const n = Math.max(x.length, y.length);
+  for (let i = 0; i < n; i++) {
+    diff |= (x.charCodeAt(i) || 0) ^ (y.charCodeAt(i) || 0);
+  }
   return diff === 0;
 }
 

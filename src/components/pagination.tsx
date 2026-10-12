@@ -20,8 +20,11 @@ const WINDOW = 1;
 
 /**
  * 要显示哪些页码，null 表示这里是个省略号。
+ *
+ * 文章分页和搜索结果分页共用这一个窗口算法（搜索页把 null 渲染成「…」），
+ * 保证两处的省略号出现时机一致，不会各自漂移。
  */
-function pageItems(current: number, total: number): (number | null)[] {
+export function pageItems(current: number, total: number): (number | null)[] {
   // 窗口里最多这么多个：首页 + 尾页 + 当前页及其左右 + 两个省略号
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
 

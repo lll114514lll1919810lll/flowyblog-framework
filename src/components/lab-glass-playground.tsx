@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   GLASS_PARAM_KEYS,
   GLASS_PARAM_RANGES,
@@ -37,6 +37,14 @@ export function LabGlassPlayground() {
     glassParamsSnapshot,
   );
   const [copied, setCopied] = useState(false);
+  // 「复制成功 2 秒复原」的定时器：组件随实验开关频繁挂载/卸载，
+  // 卸载后必须清掉，否则定时器还会对一个已卸载的组件 setState
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    };
+  }, []);
 
   // 快照是全量的 JSON；这里取出当前主题那一套
   const params = useMemo((): GlassParams => {
@@ -55,7 +63,8 @@ export function LabGlassPlayground() {
     try {
       await navigator.clipboard.writeText(glassParamsJson());
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+      copiedTimer.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       // 剪贴板不可用（非安全上下文）时把 JSON 挂在 title 上，至少能手动选
       setCopied(false);

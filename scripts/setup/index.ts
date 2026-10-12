@@ -20,6 +20,8 @@ import {
   c,
   closeStdin,
   consoleLogger,
+  DIRTY_FILES_MESSAGE,
+  dirtyOverlayFiles,
   jsonLogger,
   loadState,
   makeContext,
@@ -103,12 +105,10 @@ async function main(): Promise<void> {
   logger.event("setup-start", { steps: STEPS.map((s) => s.id) });
 
   // 预检：向导会覆盖的两个跟踪文件若已有未提交改动，先明示出来
-  const dirty = ctx.run("git status --porcelain -- src/lib/site.ts wrangler.toml");
-  if (dirty.code === 0 && dirty.stdout.trim()) {
-    logger.warn(
-      "src/lib/site.ts / wrangler.toml 存在未提交的改动，向导会直接覆盖它们（介意的话先 git stash 或提交）",
-    );
-    logger.event("warn-dirty", { files: dirty.stdout.trim().split(/\r?\n/) });
+  const dirty = dirtyOverlayFiles(ctx);
+  if (dirty.length > 0) {
+    logger.warn(DIRTY_FILES_MESSAGE);
+    logger.event("warn-dirty", { files: dirty });
   }
 
   const queue = only ? STEPS.filter((s) => s.id === only) : STEPS;

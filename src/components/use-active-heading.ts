@@ -90,8 +90,9 @@ export function useActiveHeading(items: TocItem[]): string {
 
     const observer = new IntersectionObserver(pickActive, {
       // 观察区上边界下移 1/3 视口，与 pickActive 的阅读线保持一致；
-      // 下边界收到视口 90% 处，让接近滚到底部的标题也能触发回调
-      rootMargin: "-33% 0px -90% 0px",
+      // 下边界收到视口 10% 处（rootMargin 的负值是「收缩」，-90% 会让
+      // 观察区变成负高度、任何元素都无法相交，观察器等于永远不触发）
+      rootMargin: "-33% 0px -10% 0px",
       threshold: [0, 1],
     });
     for (const heading of headings) observer.observe(heading);

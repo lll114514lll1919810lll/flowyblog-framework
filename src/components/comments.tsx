@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AdminBadge } from "@/components/admin-badge";
+import { deleteAdminComment, patchAdminBadge } from "@/lib/admin-comments";
+import { refreshAdminSession, useIsAdmin } from "@/lib/admin-session";
 import { absoluteTime, relativeTime } from "@/lib/time";
 
 /**
@@ -53,8 +55,12 @@ export function Comments({ page }: { page: string }) {
   const [notice, setNotice] = useState("");
   /** 是否跑在本机（决定显示开发者提示还是访客提示） */
   const [isLocal, setIsLocal] = useState(false);
-  /** 当前访客是否是管理员（决定要不要渲染管理按钮） */
-  const [isAdmin, setIsAdmin] = useState(false);
+  /**
+   * 当前访客是否是管理员（决定要不要渲染管理按钮）。
+   * 走全局登录态 store（lib/admin-session）：底栏入口每页都会探测一次，
+   * 这里复用同一次请求和同一份状态，不再自己发第二条探测。
+   */
+  const isAdmin = useIsAdmin();
 
   const [name, setName] = useState("");
   const [text, setText] = useState("");
@@ -79,11 +85,12 @@ export function Comments({ page }: { page: string }) {
   const replyRef = useRef<HTMLTextAreaElement>(null);
 
   /*
-   * 拉取评论 + 判断是否管理员。
+   * 拉取评论 + 探测管理员登录态。
    *
-   * 两个请求并行：管理员身份对普通访客是一次多余的请求，但它只做一次
-   * 签名校验、不查库，代价可以忽略；换来的是管理员登录后打开文章页
-   * 就能直接管理，不需要任何额外操作或入口。
+   * 登录态走 refreshAdminSession()：它有模块级并发去重，和底栏的
+   * AdminEntry 共用同一次请求；管理员身份对普通访客是一次多余的请求，
+   * 但它只做一次签名校验、不查库，代价可以忽略；换来的是管理员登录后
+   * 打开文章页就能直接管理，不需要任何额外操作或入口。
    *
    * 所有 setState 都写在 await 之后：effect 里同步 setState 会触发
    * react-hooks/set-state-in-effect（多一轮级联渲染）。
@@ -91,27 +98,16 @@ export function Comments({ page }: { page: string }) {
   useEffect(() => {
     const controller = new AbortController();
 
+    void refreshAdminSession();
+
     (async () => {
       try {
-        const [listRes, sessionRes] = await Promise.all([
-          fetch(`/api/comments?page=${encodeURIComponent(page)}`, {
-            headers: { accept: "application/json" },
-            signal: controller.signal,
-          }),
-          // 会话探测失败不该拖垮评论区，单独兜住
-          fetch("/api/admin/session", {
-            headers: { accept: "application/json" },
-            signal: controller.signal,
-          }).catch(() => null),
-        ]);
+        const listRes = await fetch(`/api/comments?page=${encodeURIComponent(page)}`, {
+          headers: { accept: "application/json" },
+          signal: controller.signal,
+        });
 
         if (controller.signal.aborted) return;
-
-        if (sessionRes?.ok) {
-          const s = await sessionRes.json().catch(() => null);
-          if (controller.signal.aborted) return;
-          setIsAdmin(Boolean(s?.authenticated));
-        }
 
         // 404：本地 pnpm dev 没有 Functions；503：线上没配 D1 绑定
         if (listRes.status === 404 || listRes.status === 503) {
@@ -269,29 +265,27 @@ export function Comments({ page }: { page: string }) {
   async function remove(id: number) {
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/admin/comments?id=${id}`, {
-        method: "DELETE",
-      });
+      const r = await deleteAdminComment(id);
 
-      if (res.status === 401) {
-        setIsAdmin(false);
+      if (r.status === 401) {
+        // 会话可能已过期，让全局登录态（含底栏入口）重新探测一次
+        void refreshAdminSession();
         setNotice("登录已失效，请重新登录后再试");
         return;
       }
-
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        setNotice(body?.error || "删除失败");
+      if (r.status === 0) {
+        setNotice("网络异常，删除失败");
+        return;
+      }
+      if (!r.ok) {
+        setNotice(r.error || "删除失败");
         return;
       }
 
       setPendingDelete(null);
-      setNotice(
-        body?.removed > 1 ? `已删除（含 ${body.removed - 1} 条回复）` : "已删除",
-      );
+      const removed = typeof r.body?.removed === "number" ? r.body.removed : 0;
+      setNotice(removed > 1 ? `已删除（含 ${removed - 1} 条回复）` : "已删除");
       setReloadKey((k) => k + 1);
-    } catch {
-      setNotice("网络异常，删除失败");
     } finally {
       setDeletingId(null);
     }
@@ -300,9 +294,9 @@ export function Comments({ page }: { page: string }) {
   /**
    * 开关某条的管理员徽标。
    *
-   * 和后台 admin-dashboard.tsx 里的同名函数逻辑一致（乐观更新 + 失败回滚），
-   * 没抽成共用 hook：两边改的是各自的 state（这里是 comments，后台是 items），
-   * 类型和分页处理也不同，抽出来要为两个调用方做泛型适配，比复制十行更绕。
+   * 请求部分与后台 admin-dashboard.tsx 共用（lib/admin-comments.ts），
+   * 这里只保留自己的一套状态逻辑：乐观更新 + 失败回滚 + 401 提示
+   * （后台那边 401 是跳登录页，两边界面语义不同）。
    */
   async function toggleBadge(id: number, next: 0 | 1) {
     if (badgeBusy !== null) return;
@@ -315,27 +309,18 @@ export function Comments({ page }: { page: string }) {
     );
 
     try {
-      const res = await fetch("/api/admin/comments", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id, admin_badge: next }),
-      });
+      const r = await patchAdminBadge(id, next);
+      if (r.ok) return;
 
-      if (res.status === 401) {
-        setComments(prev);
-        setIsAdmin(false);
-        setNotice("登录已失效，请重新登录后再试");
-        return;
-      }
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        setComments(prev);
-        setNotice(body?.error || "徽标设置失败");
-      }
-    } catch {
       setComments(prev);
-      setNotice("网络异常，徽标设置失败");
+      if (r.status === 401) {
+        void refreshAdminSession();
+        setNotice("登录已失效，请重新登录后再试");
+      } else if (r.status === 0) {
+        setNotice("网络异常，徽标设置失败");
+      } else {
+        setNotice(r.error || "徽标设置失败");
+      }
     } finally {
       setBadgeBusy(null);
     }

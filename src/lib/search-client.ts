@@ -75,6 +75,40 @@ export type SearchOptions = {
 /** 模糊匹配只处理这么长的词：更长的基本是复制粘贴，没必要容错 */
 const FUZZY_MAX_TOKEN = 32;
 
+/* --------------------------------------------------------- 小写化缓存 --- */
+
+/**
+ * 每次击键都会对全部文章的全部小节做 includes 匹配，而匹配前都要
+ * toLowerCase——索引是构建期生成、运行期不变的，小写文本可以按对象缓存，
+ * 只在第一次查询时算一遍。WeakMap：换索引（页面刷新）后旧条目自动可回收。
+ */
+const loweredDocs = new WeakMap<SearchDoc, { title: string; tags: string; desc: string }>();
+function loweredDoc(doc: SearchDoc) {
+  let v = loweredDocs.get(doc);
+  if (!v) {
+    v = {
+      title: doc.title.toLowerCase(),
+      tags: doc.tags.join(" ").toLowerCase(),
+      desc: doc.description.toLowerCase(),
+    };
+    loweredDocs.set(doc, v);
+  }
+  return v;
+}
+
+const loweredSections = new WeakMap<SearchSection, { heading: string; text: string }>();
+function loweredSection(section: SearchSection) {
+  let v = loweredSections.get(section);
+  if (!v) {
+    v = {
+      heading: section.heading.toLowerCase(),
+      text: section.text.toLowerCase(),
+    };
+    loweredSections.set(section, v);
+  }
+  return v;
+}
+
 /** 子序列判定：词的字符在目标里按顺序出现即可（允许跳过个别字符） */
 export function isSubsequence(needle: string, haystack: string): boolean {
   let i = 0;
@@ -117,9 +151,7 @@ export function searchSections(
       continue;
     }
 
-    const title = doc.title.toLowerCase();
-    const tags = doc.tags.join(" ").toLowerCase();
-    const desc = doc.description.toLowerCase();
+    const { title, tags, desc } = loweredDoc(doc);
 
     // 文章级 AND：每个词在字段或任意小节里出现（严格子串；模糊模式下再试子序列）
     const satisfied = tokens.every((token) => {
@@ -127,7 +159,8 @@ export function searchSections(
         return true;
       }
       for (const s of doc.sections) {
-        if (s.heading.toLowerCase().includes(token) || s.text.toLowerCase().includes(token)) {
+        const l = loweredSection(s);
+        if (l.heading.includes(token) || l.text.includes(token)) {
           return true;
         }
       }
@@ -140,10 +173,8 @@ export function searchSections(
           return true;
         }
         for (const s of doc.sections) {
-          if (
-            isSubsequence(token, s.heading.toLowerCase()) ||
-            isSubsequence(token, s.text.toLowerCase())
-          ) {
+          const l = loweredSection(s);
+          if (isSubsequence(token, l.heading) || isSubsequence(token, l.text)) {
             return true;
           }
         }
@@ -160,8 +191,7 @@ export function searchSections(
     let docRows = 0;
 
     for (const section of doc.sections) {
-      const heading = section.heading.toLowerCase();
-      const text = section.text.toLowerCase();
+      const { heading, text } = loweredSection(section);
       let score = docScore;
       let at = -1;
       let hasToken = false;
@@ -206,11 +236,18 @@ export function searchSections(
     }
   }
 
-  return rows.sort(
-    (a, b) =>
-      b.score - a.score ||
-      (b.doc.publishedAt ?? b.doc.date).localeCompare(a.doc.publishedAt ?? a.doc.date) ||
-      a.doc.slug.localeCompare(b.doc.slug),
+  return rows.sort(compareByScore);
+}
+
+/** 结果排序比较器：得分 → 发布时间 → slug。文章级和小节级共用一份 */
+function compareByScore(
+  a: { score: number; doc: SearchDoc },
+  b: { score: number; doc: SearchDoc },
+): number {
+  return (
+    b.score - a.score ||
+    (b.doc.publishedAt ?? b.doc.date).localeCompare(a.doc.publishedAt ?? a.doc.date) ||
+    a.doc.slug.localeCompare(b.doc.slug)
   );
 }
 
@@ -249,13 +286,18 @@ export function search(
       matches: ids.size,
       fuzzy: row.fuzzy,
     }))
-    .sort(
-      (a, b) =>
-        b.score - a.score ||
-        (b.doc.publishedAt ?? b.doc.date).localeCompare(a.doc.publishedAt ?? a.doc.date) ||
-        a.doc.slug.localeCompare(b.doc.slug),
-    )
+    .sort(compareByScore)
     .slice(0, limit);
+}
+
+/** 严格零结果时再按模糊重跑一遍的共用骨架；fuzzy 标记告知调用方结果是容错过的 */
+function withFuzzyFallback<T>(
+  run: (fuzzy: boolean) => T[],
+): { rows: T[]; fuzzy: boolean } {
+  const strict = run(false);
+  if (strict.length) return { rows: strict, fuzzy: false };
+  const fuzzyRows = run(true);
+  return { rows: fuzzyRows, fuzzy: fuzzyRows.length > 0 };
 }
 
 /** 严格零结果时再按模糊重跑一遍；fuzzy 标记告知调用方结果是容错过的 */
@@ -264,10 +306,10 @@ export function searchWithFallback(
   query: string,
   opts: SearchOptions = {},
 ): { hits: Hit[]; fuzzy: boolean } {
-  const hits = search(index, query, opts);
-  if (hits.length) return { hits, fuzzy: false };
-  const fuzzyHits = search(index, query, { ...opts, fuzzy: true });
-  return { hits: fuzzyHits, fuzzy: fuzzyHits.length > 0 };
+  const { rows: hits, fuzzy } = withFuzzyFallback((fz) =>
+    search(index, query, { ...opts, fuzzy: fz }),
+  );
+  return { hits, fuzzy };
 }
 
 /** searchSections 的模糊回退版，语义同上 */
@@ -276,10 +318,7 @@ export function searchSectionsWithFallback(
   query: string,
   opts: SearchOptions = {},
 ): { rows: SectionHit[]; fuzzy: boolean } {
-  const rows = searchSections(index, query, opts);
-  if (rows.length) return { rows, fuzzy: false };
-  const fuzzyRows = searchSections(index, query, { ...opts, fuzzy: true });
-  return { rows: fuzzyRows, fuzzy: fuzzyRows.length > 0 };
+  return withFuzzyFallback((fz) => searchSections(index, query, { ...opts, fuzzy: fz }));
 }
 
 /**

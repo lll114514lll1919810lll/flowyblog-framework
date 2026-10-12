@@ -119,8 +119,15 @@ function easeScrollTo(targetTop: number, lockId: string | null): void {
   // 已经到位或距离极短时直接跳，省掉一次动画。
   // 减少动态效果时同样直接跳，不做缓动。
   if (prefersReducedMotion() || Math.abs(distance) < 8) {
+    // scrollTo 自己产生的 scroll 事件在下一帧渲染步骤里才派发，
+    // 先用 programmatic 挡掉它再恢复监听——否则高亮锁刚挂上就被
+    // 这一跳自己的 scroll 事件解锁，「跳转后锁定在目标项」失效
+    programmatic = true;
     window.scrollTo(0, targetTop);
     lockTo(lockId);
+    requestAnimationFrame(() => {
+      programmatic = false;
+    });
     return;
   }
 
@@ -162,8 +169,14 @@ function easeScrollTo(targetTop: number, lockId: string | null): void {
        * 判定：跳到最后那一节时（页面滚不动了）它会选中上面一节，
        * 于是刚跳过去的高亮又回落一次，看起来像闪动。
        * 保持锁定，等用户真正滚动再解锁。
+       *
+       * 最后一帧 scrollTo 的 scroll 事件在下一帧才派发，programmatic
+       * 要先挡掉它——这里同样用 rAF 延迟复位，避免动画收尾的事件
+       * 把锁顺手动掉。
        */
-      programmatic = false;
+      requestAnimationFrame(() => {
+        programmatic = false;
+      });
     }
   };
 

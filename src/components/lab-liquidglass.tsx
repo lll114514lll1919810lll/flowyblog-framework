@@ -79,10 +79,10 @@ type CheapFilter = {
   saturation: number;
 };
 
-/** 面板上的标记：CSS 靠它把面板底转透明 */
 /** 会被当作玻璃候选的面板。三处（量元素、逐帧预检、嵌套判断）共用一份 */
 const PANEL_SELECTOR = ".panel, .panel-strong, .panel-raised";
 
+/** 面板上的标记：CSS 靠它把面板底转透明 */
 const PANEL_ATTR = "data-lab-glass-panel";
 
 /**
@@ -693,9 +693,7 @@ export function LiquidGlassPanels() {
       const scrollY = window.scrollY;
       const parts: string[] = [];
       const dims: number[] = [];
-      for (const panel of document.querySelectorAll<HTMLElement>(
-        ".panel, .panel-strong, .panel-raised",
-      )) {
+      for (const panel of document.querySelectorAll<HTMLElement>(PANEL_SELECTOR)) {
         const r = panel.getBoundingClientRect();
         /*
           跟随文档流的面板用**文档坐标**，别用视口坐标。
@@ -834,9 +832,10 @@ export function LiquidGlassPanels() {
         */
         let smallOnly = true;
         for (let i = 0; i < parts.length; i++) {
-          const changed =
+          // 名字别和外层的 changed 撞：这里判断的是「第 i 块变没变」
+          const partChanged =
             i >= lastGeometryParts.length || parts[i] !== lastGeometryParts[i];
-          if (!changed) continue;
+          if (!partChanged) continue;
           const sizeChanged =
             i >= lastGeometryDims.length || dims[i] !== lastGeometryDims[i];
           if (sizeChanged && dims[i] > SMOOTH_MAX_DIM) {

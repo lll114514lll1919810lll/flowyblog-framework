@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import GithubSlugger from "github-slugger";
-import { getAllPosts } from "@/lib/posts";
+import { extractMetadataBlock, getAllPosts, stripMath } from "@/lib/posts";
 
 /**
  * 构建期生成站内搜索索引。
@@ -33,7 +33,6 @@ export type SearchDoc = {
 };
 
 export type SearchIndex = {
-  version: number;
   docs: SearchDoc[];
 };
 
@@ -43,30 +42,9 @@ const CHUNK_SIZE = 1200;
 const CHUNK_OVERLAP = 100;
 
 /**
- * 去掉 LaTeX 公式源码（$...$ 行内、$$...$$ 块级）。
- *
- * remark-math 会把它们渲染成公式，但索引抓的是 MDX 源码——
- * 不去掉的话，搜「frac」会命中 \frac{a}{b}，摘要里也会冒出 LaTeX 源码。
- *
- * 顺序有讲究，不能乱：
- * 1. 正文里的字面美元按书写规范写成 \$（见 10-latex.mdx 的说明），
- *    先换成占位符保护起来，否则第 3 步会把它当成公式定界符、
- *    把货币金额之类的文本一并吃掉；
- * 2. 成对的 $$...$$ 整块换掉（[\s\S] 让它可以跨行）；
- * 3. 未闭合的 $$ 删掉至文末（书写错误时的兜底）；
- * 4. 剩下的成对 $...$ 换掉；
- * 5. 占位符还原成 $。
+ * 公式源码清洗用 posts.ts 的 stripMath——目录（getTableOfContents）和搜索索引
+ * 必须用同一套规则算标题锚点，否则同一次搜索跳过去的位置和目录跳转对不上。
  */
-function stripMath(text: string): string {
-  // 不可能出现在正文里的标记串做占位符
-  const PLACEHOLDER = "__FLOWYBLOG_DOLLAR__";
-  return text
-    .replace(/\\\$/g, PLACEHOLDER)
-    .replace(/\$\$[\s\S]*?\$\$/g, " ")
-    .replace(/\$\$[\s\S]*$/, " ")
-    .replace(/\$[^$\n]+?\$/g, " ")
-    .replaceAll(PLACEHOLDER, "$");
-}
 
 /**
  * 把 MDX 抹成纯文本。
@@ -77,8 +55,10 @@ function stripMath(text: string): string {
 function toPlainText(source: string): string {
   let text = source;
 
-  // 1. metadata 导出块（多行，到顶格的 "};" 结束）
-  text = text.replace(/^export const metadata[\s\S]*?^\};$/m, "");
+  // 1. metadata 导出块（正常情况下行扫描已跳过，这里对单段文本兜底；
+  //    块定位规则与行扫描同源，见 extractMetadataBlock）
+  const metaBlock = extractMetadataBlock(text);
+  if (metaBlock) text = text.replace(metaBlock, "");
 
   // 2. import / export 语句
   text = text.replace(/^\s*(import|export)\s.*$/gm, "");
@@ -135,20 +115,15 @@ export function buildSearchIndex(): SearchIndex {
     const sections: SearchSection[] = [];
     let current: SearchSection = { id: "", heading: "", text: "" };
 
+    // metadata 块整块先摘掉：对象体里可能出现 title/date/tags 等行，
+    // 不摘的话会被当成开头小节的正文进索引。块定位用和 parseMetadata
+    // 同一份的括号配对实现（见 extractMetadataBlock），规则不会漂移。
+    const metaBlock = extractMetadataBlock(source);
+    const body = metaBlock ? source.replace(metaBlock, "") : source;
+
     let inCodeBlock = false;
     let inMathBlock = false;
-    let inMetadata = false;
-    for (const rawLine of source.split("\n")) {
-      // metadata 是多行对象字面量，必须连对象体一起跳过；
-      // 只跳 export 那一行的话，title/date/tags 会当成开头小节的正文进索引
-      if (/^export const metadata/.test(rawLine)) {
-        inMetadata = true;
-        continue;
-      }
-      if (inMetadata) {
-        if (/^\};?\s*$/.test(rawLine)) inMetadata = false;
-        continue;
-      }
+    for (const rawLine of body.split("\n")) {
       if (/^\s*```/.test(rawLine)) {
         inCodeBlock = !inCodeBlock;
         continue;
@@ -217,5 +192,5 @@ export function buildSearchIndex(): SearchIndex {
     };
   });
 
-  return { version: 2, docs };
+  return { docs };
 }
