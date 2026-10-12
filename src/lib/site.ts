@@ -10,6 +10,9 @@ export const siteConfig = {
   // 图片路径（如 "/site-logo.jpg"）则显示圆形裁切的图片，尺寸和裁切
   // 仍由 globals.css 的 .site-logo-badge 负责。
   logo: "",
+  // 浏览器标签页图标，与上面的顶栏 logo 相互独立。填写 public 下的图片路径，
+  // 例如 "/images/favicon.png"；留空则使用 public/favicon.ico。
+  favicon: "/favicon.ico",
   // 正式域名。部署后改成自己的域名，sitemap 等会用到；
   // Cloudflare Pages 每次推送都会重新构建，改这里之后要 push 才生效。
   url: "https://lll114514lll1919810lll.github.io/flowyblog-framework",

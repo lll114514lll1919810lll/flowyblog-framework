@@ -83,6 +83,8 @@ export const siteConfig = {
   name: "我的博客",        // 站点名，出现在顶栏、标题模板、读屏标签里
   author: "博主",          // 页脚版权、关于页
   description: "记录技术、思考与生活。",  // 页脚签名与站点描述
+  logo: "",                // 顶栏左上角 logo；留空使用站名首字
+  favicon: "/favicon.ico", // 浏览器标签页图标；可改为 public 下的图片路径
   url: "https://example.com",            // 正式域名，sitemap 用
   github: "https://github.com/your-name",
   repo: "https://github.com/your-name/your-blog",  // 源码仓库
@@ -100,6 +102,16 @@ export const siteConfig = {
 顶栏左上角默认是纯 CSS 渲染的「圆形底 + 站名首字」，自动取 `siteConfig.name` 的第一个字符，不依赖任何图片。想换成图片 logo，在 `src/lib/site.ts` 的 `siteConfig.logo` 填 public 下的图片路径（如 `"/site-logo.jpg"`）即可，圆形裁切由 `globals.css` 里的 `.site-logo-badge` 负责。
 
 图片 logo 走 `next/image` 是安全的：导出构建会关闭优化器（`images.unoptimized`），图片直接输出原图路径。会静默 404 的是依赖 `/_next/image` 优化接口的写法——静态产物里不存在那个路由。改图片相关代码后务必跑一次导出构建验证。
+
+### 浏览器标签页图标
+
+浏览器标签页图标与顶部 logo 是两个独立入口。在 `src/lib/site.ts` 的 `siteConfig.favicon` 中填写 `public/` 下的图片路径，例如：
+
+```ts
+favicon: "/images/my-favicon.png",
+```
+
+默认使用 `public/favicon.ico`。图标地址会自动附加内容版本号并处理 GitHub Pages 子路径部署；替换图片后无需手动修改 URL。
 
 ## 写文章
 

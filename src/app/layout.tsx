@@ -4,7 +4,7 @@ import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { ReadingProgress } from "@/components/reading-progress";
 import { PageTransition } from "@/components/page-transition";
 import { LabRuntimes } from "@/components/lab-runtimes";
-import { withAssetVersion } from "@/lib/asset-version";
+import { withAssetVersion, withBasePath } from "@/lib/asset-version";
 import { LABS_INIT_SCRIPT } from "@/lib/labs";
 import { siteConfig } from "@/lib/site";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
@@ -16,6 +16,9 @@ export const metadata: Metadata = {
     template: `%s | ${siteConfig.name}`, // 子页面标题自动加上站点名
   },
   description: siteConfig.description,
+  icons: {
+    icon: withBasePath(withAssetVersion(siteConfig.favicon)),
+  },
 };
 
 const assetBasePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
