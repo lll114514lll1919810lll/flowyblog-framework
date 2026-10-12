@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AdminBadge } from "@/components/admin-badge";
-import { deleteAdminComment, patchAdminBadge } from "@/lib/admin-comments";
+import { deleteAdminComment, patchAdminBadge, patchAdminText } from "@/lib/admin-comments";
 import { notifyAdminSessionChanged } from "@/lib/admin-session";
 import { absoluteTime, relativeTime } from "@/lib/time";
 
@@ -44,6 +44,9 @@ type Payload = {
  */
 const PAGE_SIZE = 10;
 
+/** 编辑内容时的字数上限，与访客发表表单（comments.tsx）保持一致 */
+const MAX_TEXT = 500;
+
 export function AdminDashboard() {
   const router = useRouter();
 
@@ -63,6 +66,12 @@ export function AdminDashboard() {
 
   /** 徽标开关正在提交的那条 id（同一时刻只允许一个在飞，避免连点乱序） */
   const [badgeBusy, setBadgeBusy] = useState<number | null>(null);
+
+  /** 正在编辑内容的那条 id；null = 没有行处于编辑态（同一时刻只编辑一条） */
+  const [editingId, setEditingId] = useState<number | null>(null);
+  /** 编辑框的当前内容，进入编辑时用该条原文预填 */
+  const [editText, setEditText] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
 
   /** 全站评论锁。null = 还没读到（后端没有 settings 表时也是这个） */
   const [commentsLocked, setCommentsLocked] = useState<boolean | null>(null);
@@ -304,6 +313,40 @@ export function AdminDashboard() {
     }
   }
 
+  /**
+   * 保存某条修改后的留言内容。
+   *
+   * 不做乐观更新：内容编辑的成果是一段文本，保存期间原文继续展示并无害，
+   * 等接口回来再落到本地 state，省去一套回滚逻辑。合法性校验前置
+   * （trim 非空、字数上限），不合法时保存按钮直接禁用，请求发出去就是合法的；
+   * 即便如此后端仍会再验一遍——前端校验只是体验，绕过界面直调接口
+   * 才是真实威胁，和服务端其他写入通道同一个原则。
+   */
+  async function saveText(id: number) {
+    const text = editText.trim();
+    if (!text || Array.from(text).length > MAX_TEXT || editBusy) return;
+    setEditBusy(true);
+    setError("");
+
+    try {
+      const r = await patchAdminText(id, text);
+      if (r.ok) {
+        setItems((list) => list.map((c) => (c.id === id ? { ...c, text } : c)));
+        setEditingId(null);
+        return;
+      }
+      if (r.status === 401) {
+        router.replace("/adminlogin");
+      } else if (r.status === 0) {
+        setError("网络异常，内容没有保存上");
+      } else {
+        setError(r.error || "内容保存失败");
+      }
+    } finally {
+      setEditBusy(false);
+    }
+  }
+
   async function logout() {
     await fetch("/api/admin/session", { method: "DELETE" }).catch(() => {});
     // Cookie 已清掉，让底栏的后台入口跟着消失（底栏在根布局里不会重新挂载）
@@ -482,65 +525,127 @@ export function AdminDashboard() {
                 </span>
               </div>
 
-              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-secondary">
-                {c.text}
-              </p>
+              {editingId === c.id ? (
+                <div className="mt-2 flex flex-col gap-1.5">
+                  <textarea
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    maxLength={MAX_TEXT}
+                    rows={4}
+                    aria-label={`编辑留言 #${c.id} 的内容`}
+                    className="field-input resize-y"
+                  />
+                  <span
+                    className={`self-end text-xs tabular-nums ${
+                      editText.length >= MAX_TEXT ? "text-red-600 dark:text-red-400" : "text-muted"
+                    }`}
+                  >
+                    {editText.length}/{MAX_TEXT}
+                  </span>
+                </div>
+              ) : (
+                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-secondary">
+                  {c.text}
+                </p>
+              )}
 
               <div className="mt-3 flex items-center justify-end gap-2">
-                {/* 徽标开关放左边、和删除分开一组：两者后果轻重完全不同
-                    （一个可逆、一个连带删回复），挤在一起容易误点删除。
-                    aria-pressed 而不是 checkbox：它视觉上是个按钮，
-                    语义是「这个标记开没开」，读屏念「已按下」最贴切。 */}
-                <button
-                  type="button"
-                  aria-pressed={Boolean(c.admin_badge)}
-                  disabled={badgeBusy === c.id}
-                  onClick={() =>
-                    toggleBadge(c.id, c.admin_badge ? 0 : 1)
-                  }
-                  className={`btn-pill mr-auto ${
-                    c.admin_badge ? "text-[var(--gold)]" : ""
-                  }`}
-                  title={
-                    c.admin_badge
-                      ? "点击取消这条的管理员徽标"
-                      : "点击在这条昵称旁显示金色管理员徽标"
-                  }
-                >
-                  {badgeBusy === c.id
-                    ? "设置中…"
-                    : c.admin_badge
-                      ? "取消徽标"
-                      : "加徽标"}
-                </button>
-
-                {pendingDelete === c.id ? (
+                {editingId === c.id ? (
                   <>
-                    <span className="text-xs text-muted">确定删除？</span>
                     <button
                       type="button"
-                      disabled={deleting}
-                      onClick={() => remove(c.id)}
-                      className="btn-pill text-red-600 dark:text-red-400"
+                      disabled={
+                        editBusy ||
+                        !editText.trim() ||
+                        editText.length > MAX_TEXT
+                      }
+                      onClick={() => saveText(c.id)}
+                      className="btn-pill"
                     >
-                      {deleting ? "删除中…" : "确认删除"}
+                      {editBusy ? "保存中…" : "保存"}
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPendingDelete(null)}
+                      disabled={editBusy}
+                      onClick={() => setEditingId(null)}
                       className="btn-pill"
                     >
                       取消
                     </button>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setPendingDelete(c.id)}
-                    className="btn-pill"
-                  >
-                    删除
-                  </button>
+                  <>
+                    {/* 徽标开关放左边、和删除分开一组：两者后果轻重完全不同
+                        （一个可逆、一个连带删回复），挤在一起容易误点删除。
+                        aria-pressed 而不是 checkbox：它视觉上是个按钮，
+                        语义是「这个标记开没开」，读屏念「已按下」最贴切。 */}
+                    <button
+                      type="button"
+                      aria-pressed={Boolean(c.admin_badge)}
+                      disabled={badgeBusy === c.id}
+                      onClick={() =>
+                        toggleBadge(c.id, c.admin_badge ? 0 : 1)
+                      }
+                      className={`btn-pill mr-auto ${
+                        c.admin_badge ? "text-[var(--gold)]" : ""
+                      }`}
+                      title={
+                        c.admin_badge
+                          ? "点击取消这条的管理员徽标"
+                          : "点击在这条昵称旁显示金色管理员徽标"
+                      }
+                    >
+                      {badgeBusy === c.id
+                        ? "设置中…"
+                        : c.admin_badge
+                          ? "取消徽标"
+                          : "加徽标"}
+                    </button>
+
+                    {/* 编辑内容：进入行内编辑态。同一行若还挂着删除二次确认，
+                        一并收起——编辑和删除共用一块操作区，两个流程叠着
+                        容易点错。 */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(c.id);
+                        setEditText(c.text);
+                        setPendingDelete(null);
+                      }}
+                      className="btn-pill"
+                    >
+                      编辑
+                    </button>
+
+                    {pendingDelete === c.id ? (
+                      <>
+                        <span className="text-xs text-muted">确定删除？</span>
+                        <button
+                          type="button"
+                          disabled={deleting}
+                          onClick={() => remove(c.id)}
+                          className="btn-pill text-red-600 dark:text-red-400"
+                        >
+                          {deleting ? "删除中…" : "确认删除"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingDelete(null)}
+                          className="btn-pill"
+                        >
+                          取消
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setPendingDelete(c.id)}
+                        className="btn-pill"
+                      >
+                        删除
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </li>

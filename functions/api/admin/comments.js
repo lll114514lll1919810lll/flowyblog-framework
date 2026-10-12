@@ -2,8 +2,8 @@
  * 管理后台的数据接口。
  *
  *   GET    /api/admin/comments?limit=&offset=&q=&page=&status=   列出留言（含总数）
- *   PATCH  /api/admin/comments   { id, admin_badge?, approved?, pinned? }
- *                                        开关徽标 / 审核通过 / 置顶
+ *   PATCH  /api/admin/comments   { id, admin_badge?, approved?, pinned?, text? }
+ *                                        开关徽标 / 审核通过 / 置顶 / 修改内容
  *   DELETE /api/admin/comments?id=<id>                    删除单条（级联删回复）
  *
  * 与面向访客的 /api/comments 分开：
@@ -17,6 +17,7 @@ import {
   adminJson,
   deleteCommentCascade,
   hasSession,
+  MAX_TEXT,
   PAGE_RE,
   readJson,
 } from "../../_lib/api.js";
@@ -92,11 +93,11 @@ export async function onRequestGet({ request, env }) {
 }
 
 /**
- * 部分更新某条留言：开关管理员徽标（admin_badge）、审核状态（approved）
- * 或置顶状态（pinned）。
+ * 部分更新某条留言：开关管理员徽标（admin_badge）、审核状态（approved）、
+ * 置顶状态（pinned）或修改内容（text）。
  *
- *   PATCH /api/admin/comments   { id, admin_badge?, approved?, pinned? }
- *     → { ok, id, admin_badge?, approved?, pinned? }
+ *   PATCH /api/admin/comments   { id, admin_badge?, approved?, pinned?, text? }
+ *     → { ok, id, admin_badge?, approved?, pinned?, text? }
  *
  * 字段都可选，传哪个更新哪个，但至少传一个；徽标语义走 PATCH 而不是
  * POST（POST 在访客接口那边是「发表」）。pinned 取值 0/1/2/3：
@@ -106,6 +107,10 @@ export async function onRequestGet({ request, env }) {
  * AI 身份，之后就再也认不出它、也没法放回 AI 池了。
  * 徽标值严格校验成 0/1——布尔、字符串都拒，避免 SQLite 把 truthy 值
  * 悄悄存成 1 之外的东西。
+ * text 走与访客发表相同的校验：trim 后非空、最多 MAX_TEXT 字（按码点
+ * 计数，emoji 不算双倍）。管理员改内容不设限流、不区分审核状态——
+ * 包括 AI 总结（pinned 2/3）的正文也允许订正，查重按 page 而不是
+ * 内容，改文字不会破坏「一篇文章至多一条总结」的约束。
  */
 export async function onRequestPatch({ request, env }) {
   if (!(await hasSession(request, env || {}))) {
@@ -124,7 +129,8 @@ export async function onRequestPatch({ request, env }) {
   const wantsBadge = body.admin_badge !== undefined;
   const wantsApproved = body.approved !== undefined;
   const wantsPinned = body.pinned !== undefined;
-  if (!wantsBadge && !wantsApproved && !wantsPinned) {
+  const wantsText = body.text !== undefined;
+  if (!wantsBadge && !wantsApproved && !wantsPinned && !wantsText) {
     return adminJson({ error: "没有要更新的字段" }, 400);
   }
   if (wantsBadge && body.admin_badge !== 0 && body.admin_badge !== 1) {
@@ -141,6 +147,15 @@ export async function onRequestPatch({ request, env }) {
     body.pinned !== 3
   ) {
     return adminJson({ error: "pinned 只能是 0、1、2 或 3" }, 400);
+  }
+  // 与访客发表同一套内容规则：trim 后非空、按码点数不超上限
+  let text = "";
+  if (wantsText) {
+    text = String(body.text ?? "").trim();
+    if (!text) return adminJson({ error: "留言内容不能为空" }, 400);
+    if (Array.from(text).length > MAX_TEXT) {
+      return adminJson({ error: `留言最多 ${MAX_TEXT} 字` }, 400);
+    }
   }
 
   // 先确认这条留言存在：D1 的 UPDATE 对不存在的 id 也返回成功（changes: 0），
@@ -184,6 +199,10 @@ export async function onRequestPatch({ request, env }) {
     sets.push(`pinned = ?${binds.length + 1}`);
     binds.push(body.pinned);
   }
+  if (wantsText) {
+    sets.push(`text = ?${binds.length + 1}`);
+    binds.push(text);
+  }
   await env.DB.prepare(`UPDATE comments SET ${sets.join(", ")} WHERE id = ?1`)
     .bind(...binds)
     .run();
@@ -194,6 +213,7 @@ export async function onRequestPatch({ request, env }) {
     ...(wantsBadge ? { admin_badge: body.admin_badge } : {}),
     ...(wantsApproved ? { approved: body.approved } : {}),
     ...(wantsPinned ? { pinned: body.pinned } : {}),
+    ...(wantsText ? { text } : {}),
   });
 }
 

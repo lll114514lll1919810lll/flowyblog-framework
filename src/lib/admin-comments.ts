@@ -67,6 +67,16 @@ export function patchAdminPinned(id: number, pinned: 0 | 1 | 2 | 3) {
   });
 }
 
+/** 修改留言内容（PATCH /api/admin/comments）。
+ * 后端走与访客发表同一套校验：trim 后非空、最多 500 字（按码点计数） */
+export function patchAdminText(id: number, text: string) {
+  return adminRequest("/api/admin/comments", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id, text }),
+  });
+}
+
 /** 删除单条留言（级联删回复；DELETE /api/admin/comments?id=） */
 export function deleteAdminComment(id: number) {
   return adminRequest(`/api/admin/comments?id=${id}`, { method: "DELETE" });

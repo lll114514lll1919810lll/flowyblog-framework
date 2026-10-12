@@ -45,11 +45,12 @@ export const metadata = {
 
 ### `PATCH /api/admin/comments`
 
-部分更新一条留言，请求体 `{ id, admin_badge?, approved?, pinned? }`，传哪个更新哪个，至少传一个，值严格校验：
+部分更新一条留言，请求体 `{ id, admin_badge?, approved?, pinned?, text? }`，传哪个更新哪个，至少传一个，值严格校验：
 
 - `admin_badge`：金色管理员徽标（0/1）
 - `approved`：审核通过（1）/ 撤回待审（0）
 - `pinned`：0 普通、1 置顶（仅顶层留言，对回复置顶返回 400）、2 AI 总结置顶、3 AI 总结未置顶。2/3 是 AI 总结的专属状态：只有本来就是 AI 总结的评论可以在两者之间切换，普通留言不能伪造，AI 总结也不许落回 0/1（那会抹掉 AI 身份）
+- `text`：修改留言内容。与访客发表同一套规则——trim 后非空、最多 500 字（按码点计数），改后原样存入。不限流、不区分审核状态；AI 总结（pinned 2/3）的正文也允许订正，总结查重按文章而不按内容，改文字不影响「一篇文章至多一条总结」
 
 ### `DELETE /api/admin/comments?id=<id>`
 
