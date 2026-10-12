@@ -233,7 +233,9 @@ export function SiteSearch() {
           {status === "idle" && !tokens.length && (
             <p className="site-search-hint">
               输入关键词搜索文章。多个关键词用空格分隔，全部命中才算匹配。
-              按 / 或 Ctrl K 快速聚焦搜索框<br />
+              按 <kbd className="kbd-inline">/</kbd> 或{" "}
+              <kbd className="kbd-inline">Ctrl</kbd>
+              <kbd className="kbd-inline">K</kbd> 快速聚焦搜索框<br />
               <Link href="/search" className="site-search-hint-link" onClick={closePanel}>
                 直接进入搜索页 →
               </Link>

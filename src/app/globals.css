@@ -1270,16 +1270,21 @@ html {
     "Noto Sans CJK SC", sans-serif;
 
   /**
-   * 永远为纵向滚动条预留宽度。
+   * 滚动条永远占位，且始终是真的滚动条（而不是留空的槽）。
    *
    * 不加这一条时：内容很短的页面（比如标签页）不会出现滚动条，
    * 可用宽度就比长页面宽 15px（Windows/Linux 上滚动条宽度），
    * 内容左右各外扩 7.5px。页面之间切换时能明显看出内容在轻微抖动。
    *
-   * 固定成 always 后所有页面的可用宽度一致，切换页面时内容不会位移。
-   * macOS 上滚动条默认是 overlay（不占宽度），此时这行没有副作用。
+   * 为什么用 overflow-y: scroll 而不是 scrollbar-gutter: stable：
+   * 两者都能防抖，但 scrollbar-gutter 在短页面留下的是一个「空槽」——
+   * 没有滚动条，只有背景色，于是通栏的顶栏/页脚条右缘会露出一条缝。
+   * overflow-y: scroll 让滚动条始终真实存在（短页面时它是禁用态、
+   * 滑块填满轨道），槽被滚动条本身占住，缝隙不复存在。
+   *
+   * macOS 上滚动条默认是 overlay（不占宽度），这条规则没有副作用。
    */
-  scrollbar-gutter: stable;
+  overflow-y: scroll;
 }
 
 ::selection {
@@ -2277,6 +2282,27 @@ html {
   font-family: inherit;
   font-size: 0.68rem;
   line-height: 1.4;
+}
+
+/* 嵌在提示文案里的按键样式：边框 + 微凸底色，看起来像真的键帽。
+   连续两个（如 Ctrl K）之间留一条缝，读起来是两个键的组合而不是一个词 */
+.kbd-inline {
+  display: inline-block;
+  margin: 0 0.1rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--panel-bg-raised);
+  color: var(--secondary);
+  font-family: inherit;
+  font-size: 0.75em;
+  line-height: 1.6;
+  vertical-align: baseline;
+}
+
+.kbd-inline + .kbd-inline {
+  margin-left: 0.15rem;
 }
 
 .site-search-hint {

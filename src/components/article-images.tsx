@@ -17,7 +17,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *
  * 其他细节：
  * - 预览图同样不放大：width:auto + max-width，小于屏幕的截图就按原始尺寸显示
- * - 打开时锁背景滚动；因为 html 上有 scrollbar-gutter:stable，锁了也不会跳动
+ * - 打开时锁背景滚动；因为 html 上有 overflow-y: scroll（滚动条永远占位），锁了也不会跳动
  * - 关闭后把焦点还给刚才点的那张图，键盘用户不会掉到页面顶部
  */
 export function ArticleImages() {

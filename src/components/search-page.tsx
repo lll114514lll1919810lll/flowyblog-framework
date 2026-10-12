@@ -203,7 +203,9 @@ export function SearchPage() {
           )}
         </div>
         <p className="text-sm text-muted">
-          多个关键词用空格分隔，全部命中才算匹配。顶栏搜索框也可以随时用（按 / 或 Ctrl K 聚焦）。
+          多个关键词用空格分隔，全部命中才算匹配。顶栏搜索框也可以随时用（按{" "}
+          <kbd className="kbd-inline">/</kbd> 或 <kbd className="kbd-inline">Ctrl</kbd>
+          <kbd className="kbd-inline">K</kbd> 聚焦）。
         </p>
       </header>
 
