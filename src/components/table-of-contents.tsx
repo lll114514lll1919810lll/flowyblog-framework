@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { TocItem } from "@/lib/posts";
+import { useFontSize } from "@/lib/reading-font-size";
 import {
   getScrollLock,
   scrollIntoViewIfNeeded,
@@ -160,6 +161,8 @@ function Sidebar({ items }: { items: TocItem[] }) {
   const activeId = useActiveHeading(items);
   const tree = useMemo(() => buildTree(items), [items]);
   const { activeGroupId, manualId, closingId, toggle } = useTocGroups(tree, activeId);
+  // 字号档位：变化时条目文字重新折行，指示条位置全部失效，要重测一轮
+  const { sizeId } = useFontSize();
 
   // 侧栏自身也可能超长（展开多个分组后），需要能被滚动到可视区
   const navRef = useRef<HTMLElement>(null);
@@ -260,13 +263,14 @@ function Sidebar({ items }: { items: TocItem[] }) {
       raf = requestAnimationFrame(tick);
     });
 
-    // 窗口宽度变化会让文字重新折行，所有位置失效，重测一轮
+    // 窗口宽度变化会让文字重新折行，所有位置失效，重测一轮；
+    // 字号档位切换同理（由 sizeId 参与 deps 触发 effect 重跑）
     window.addEventListener("resize", measure);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", measure);
     };
-  }, [activeId, manualId, closingId]);
+  }, [activeId, manualId, closingId, sizeId]);
 
   /**
    * 点击目录项：拦截原生锚点跳转，改用缓动滚动。
@@ -334,7 +338,7 @@ function Sidebar({ items }: { items: TocItem[] }) {
                   href={`#${node.id}`}
                   onClick={(e) => handleClick(e, node.id)}
                   aria-current={active ? "location" : undefined}
-                  className={`toc-link relative min-w-0 flex-1 rounded py-1.5 pl-4 pr-1 text-[13px] leading-snug break-words ${
+                  className={`toc-link relative min-w-0 flex-1 rounded py-1.5 pl-4 pr-1 leading-snug break-words ${
                     active
                       ? "font-medium text-accent"
                       : "text-secondary hover:text-foreground"
@@ -433,7 +437,7 @@ function Sidebar({ items }: { items: TocItem[] }) {
                         aria-current={
                           activeId === child.id ? "location" : undefined
                         }
-                        className={`toc-link relative block rounded py-1.5 pl-7 pr-1 text-[13px] leading-snug break-words ${
+                        className={`toc-link relative block rounded py-1.5 pl-7 pr-1 leading-snug break-words ${
                           activeId === child.id
                             ? "font-medium text-accent"
                             : "text-secondary hover:text-foreground"
@@ -480,8 +484,11 @@ function Collapsible({ items }: { items: TocItem[] }) {
     /* 标题行和展开内容装在同一个面板里，整块只有一圈圆角。
        原来是两个面板（标题一个 .panel、列表一个 .panel-raised .rounded-lg）
        上下紧贴，展开时接缝两侧会各露出一个内凹的弧度，
-       看起来像两块圆角硬拼在一起，而不是一个可折叠的面板。 */
-    <div className="panel">
+       看起来像两块圆角硬拼在一起，而不是一个可折叠的面板。
+
+       toc-collapsible：globals.css 按它给条目链接设定随字号档位
+       缩放的字号（.toc-collapsible a）。 */
+    <div className="panel toc-collapsible">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -545,7 +552,7 @@ function Collapsible({ items }: { items: TocItem[] }) {
                         `#${encodeURIComponent(node.id)}`,
                       );
                     }}
-                    className={`flex-1 py-1.5 text-sm transition-colors ${
+                    className={`flex-1 py-1.5 transition-colors ${
                       activeId === node.id
                         ? "font-medium text-accent"
                         : "text-secondary hover:text-foreground"
@@ -609,7 +616,7 @@ function Collapsible({ items }: { items: TocItem[] }) {
                               `#${encodeURIComponent(child.id)}`,
                             );
                           }}
-                          className={`block py-1.5 pl-5 text-sm transition-colors ${
+                          className={`block py-1.5 pl-5 transition-colors ${
                             activeId === child.id
                               ? "font-medium text-accent"
                               : "text-secondary hover:text-foreground"

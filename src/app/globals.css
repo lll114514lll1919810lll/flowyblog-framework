@@ -424,6 +424,65 @@
     background: var(--accent-soft);
   }
 
+  /* ==========================================================================
+     文章字号档位（见 lib/reading-font-size.ts 与 post-body.tsx）
+
+     PostBody 根节点的 data-font-size 决定 --font-scale，正文、目录、
+     评论区的字号都乘以这个系数（.prose / .toc-link / .toc-collapsible a /
+     .comment-item / 代码块字号）。
+     「标准」档不定义规则：缺省回退 1，服务端渲染的 HTML 天然落在这一档，
+     水合前后无跳变。关于页等不在 PostBody 内的 .prose 拿不到变量，保持原字号。
+     ========================================================================== */
+
+  [data-font-size="small"] {
+    --font-scale: 0.9;
+  }
+
+  [data-font-size="large"] {
+    --font-scale: 1.125;
+  }
+
+  /* 字号调节条：样式语言与宽度调节条一致 */
+  .font-size-control {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .font-size-options {
+    display: flex;
+    gap: 0.375rem;
+  }
+
+  .font-size-option {
+    display: inline-flex;
+    min-height: 2.25rem; /* 和其它控制线一致的 36px 触控高度 */
+    align-items: center;
+    padding: 0 0.9rem;
+    border: 1px solid var(--panel-border);
+    border-radius: 999px;
+    background: var(--panel-bg-raised);
+    color: var(--secondary);
+    font-size: 0.75rem;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: border-color 180ms ease, color 180ms ease, background-color 180ms ease;
+  }
+
+  .font-size-option:hover {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--panel-border));
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .font-size-option.is-active {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--panel-border));
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 500;
+  }
+
   /* 窄屏（< 640px）整条不渲染，开关在 post-body.tsx 的 hidden sm:block 上：
      手机上正文本来就只有一列宽，可调的余地很小，而这条控制线要占掉整整
      两行高度，压在正文前面不划算。 */
@@ -1306,7 +1365,9 @@ html {
 
 .prose {
   color: var(--foreground);
-  font-size: 1.0625rem;
+  /* 字号随文章字号档位缩放（--font-scale 由 PostBody 根节点的
+     data-font-size 提供，见文件前部的档位定义） */
+  font-size: calc(1.0625rem * var(--font-scale, 1));
   line-height: 1.9;
 }
 
@@ -1326,7 +1387,7 @@ html {
 .prose h2 {
   margin-top: 2.6em;
   margin-bottom: 0.9em;
-  font-size: 1.4rem;
+  font-size: calc(1.4rem * var(--font-scale, 1));
 }
 
 /* h2 作为整块 prose 的开头时（如关于页鸣谢面板），它承担的是块标题而不是
@@ -1338,7 +1399,7 @@ html {
 .prose h3 {
   margin-top: 2.1em;
   margin-bottom: 0.8em;
-  font-size: 1.12rem;
+  font-size: calc(1.12rem * var(--font-scale, 1));
 }
 
 .prose a {
@@ -1541,7 +1602,7 @@ html {
 
 .prose .post-figure figcaption {
   margin-top: 0.7em;
-  font-size: 0.84rem;
+  font-size: calc(0.84rem * var(--font-scale, 1));
   line-height: 1.65;
   color: var(--muted);
   text-align: center;
@@ -1556,7 +1617,7 @@ html {
 .prose table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.95rem;
+  font-size: calc(0.95rem * var(--font-scale, 1));
 }
 
 /* 表格的横向滚动容器（由 mdx-components.tsx 的 table 映射套上）。
@@ -1742,7 +1803,8 @@ html {
   overflow: hidden;
   color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.855rem;
+  /* 与 .prose pre code（代码本体）同系数缩放，行号才不会错位 */
+  font-size: calc(0.855rem * var(--font-scale, 1));
   line-height: 1.7;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -1999,7 +2061,8 @@ html {
   background: transparent;
   border: 0;
   padding: 0;
-  font-size: 0.855rem;
+  /* 与 .code-block-gutter（行号）必须同系数缩放，行号才不会错位 */
+  font-size: calc(0.855rem * var(--font-scale, 1));
 }
 
 /* ============================================================================
@@ -2096,9 +2159,22 @@ html {
    ========================================================================= */
 
 .toc-link {
+  /* 目录条目字号：随文章字号档位缩放（桌面侧栏，原 text-[13px]） */
+  font-size: calc(0.8125rem * var(--font-scale, 1));
   transition:
     color 220ms cubic-bezier(0.4, 0, 0.2, 1),
     background-color 180ms ease;
+}
+
+/* 移动端折叠版目录的条目（原 text-sm），同样随字号档位缩放 */
+.toc-collapsible a {
+  font-size: calc(0.875rem * var(--font-scale, 1));
+}
+
+/* 评论区单条留言的容器：昵称与留言正文（原 text-sm）继承这里的字号，
+   时间、按钮等界面元素有自己的 text-xs，保持不缩放 */
+.comment-item {
+  font-size: calc(0.875rem * var(--font-scale, 1));
 }
 
 .toc-sublist {

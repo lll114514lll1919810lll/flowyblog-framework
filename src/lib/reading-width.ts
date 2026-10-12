@@ -109,7 +109,12 @@ export function useReadingWidth() {
     高频触发，每次都 createElement + getContext 纯属浪费 */
 let measureCtx: CanvasRenderingContext2D | null | undefined;
 
-export function useCharsPerLine(ref: RefObject<HTMLElement | null>) {
+export function useCharsPerLine(
+  ref: RefObject<HTMLElement | null>,
+  /** 传入的值变化时强制重新量一次：字号档位切换会改字体大小，
+      但不改变元素宽度，ResizeObserver 察觉不到，需要外部踢一脚 */
+  rescaleKey?: string,
+) {
   const [chars, setChars] = useState<number>();
 
   useEffect(() => {
@@ -132,7 +137,7 @@ export function useCharsPerLine(ref: RefObject<HTMLElement | null>) {
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [ref]);
+  }, [ref, rescaleKey]);
 
   return chars;
 }

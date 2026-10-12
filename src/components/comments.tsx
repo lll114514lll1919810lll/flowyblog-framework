@@ -332,7 +332,8 @@ export function Comments({ page }: { page: string }) {
   function renderMeta(c: Comment) {
     return (
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="flex items-baseline gap-1.5 text-sm font-medium">
+        {/* 字号继承 .comment-item，随文章字号档位缩放 */}
+        <span className="flex items-baseline gap-1.5 font-medium">
           {c.name}
           {/* 徽标跟昵称在同一个 span 里：两者是「谁说的」这一个意思的两半，
               中间那个 gap-x-3（12px）会把它们拆成两组信息。 */}
@@ -485,16 +486,19 @@ export function Comments({ page }: { page: string }) {
     return (
       <div key={c.id}>
         <article
+          /* comment-item：globals.css 按它给昵称和正文提供随文章字号
+             档位缩放的字号（时间、按钮等界面元素有自己的 text-xs，不缩放） */
           className={
             isReply
-              ? "panel-raised panel rounded-[var(--radius-panel)] px-4 py-3"
-              : "panel-raised panel rounded-[var(--radius-panel)] px-4 py-4"
+              ? "comment-item panel-raised panel rounded-[var(--radius-panel)] px-4 py-3"
+              : "comment-item panel-raised panel rounded-[var(--radius-panel)] px-4 py-4"
           }
         >
           {renderMeta(c)}
           {/* whitespace-pre-wrap 保留用户输入的换行；
-              break-words 防止超长无空格串（URL）撑破面板 */}
-          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-secondary">
+              break-words 防止超长无空格串（URL）撑破面板。
+              字号继承 .comment-item，随文章字号档位缩放 */}
+          <p className="mt-2 whitespace-pre-wrap break-words leading-relaxed text-secondary">
             {c.text}
           </p>
           {renderDeleteConfirm(c, replyCount)}

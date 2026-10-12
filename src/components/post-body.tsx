@@ -9,6 +9,8 @@ import {
   useCharsPerLine,
   useReadingWidth,
 } from "@/lib/reading-width";
+import { FONT_SIZES, useFontSize } from "@/lib/reading-font-size";
+import type { FontSizeId } from "@/lib/reading-font-size";
 import type { TocItem } from "@/lib/posts";
 
 /**
@@ -35,9 +37,11 @@ export function PostBody({
   children: ReactNode;
 }) {
   const { widthId, setWidth } = useReadingWidth();
-  // 「每行多少字」得按正文列的真实宽度算，所以 ref 挂在下面的 .prose 上
+  const { sizeId, setSize } = useFontSize();
+  // 「每行多少字」得按正文列的真实宽度算，所以 ref 挂在下面的 .prose 上；
+  // sizeId 变化意味着字号变了，每行字数要跟着重测
   const proseRef = useRef<HTMLDivElement>(null);
-  const charsPerLine = useCharsPerLine(proseRef);
+  const charsPerLine = useCharsPerLine(proseRef, sizeId);
   const width =
     READING_WIDTHS.find((w) => w.id === widthId) ?? READING_WIDTHS[1];
   const currentIndex = READING_WIDTHS.findIndex((w) => w.id === widthId);
@@ -46,10 +50,16 @@ export function PostBody({
   return (
     /* data-reading-width 是给 CSS 用的：目录放右侧还是挤回顶部，
        取决于「当前档位的正文宽度 + 侧栏 + 间距」在视口里放不放得下。
-       媒体查询读不了 CSS 变量，所以由这个属性在 CSS 里分档写死门槛。 */
+       媒体查询读不了 CSS 变量，所以由这个属性在 CSS 里分档写死门槛。
+
+       data-font-size 同理：正文、目录、评论区的字号都乘以
+       globals.css 按这个属性定义的 --font-scale。
+       正文/目录/评论区恰好都在这个包裹层里，一个属性全覆盖，
+       又不会波及关于页等同样用了 .prose 的地方。 */
     <div
       className="flex flex-col gap-10 sm:gap-12"
       data-reading-width={widthId}
+      data-font-size={sizeId}
     >
       {/* 放不下时目录挤在顶部，收进一个折叠按钮 */}
       <div className="toc-top-slot">
@@ -71,6 +81,12 @@ export function PostBody({
           style={{ maxWidth: width.maxWidth }}
         >
           {header}
+
+          {/* 字号：三档，手机上也显示——小屏阅读恰恰最需要调字号，
+              而这条控制线只是一排小胶囊，占不了多少高度。 */}
+          <div className="pb-4">
+            <FontSizeControl currentId={sizeId} onSelect={setSize} />
+          </div>
 
           {/* 窄屏不显示这条：手机上正文本来就只有一列宽，可调的余地很小，
               而这条控制线要占掉整整两行高度，压在正文前面不划算。 */}
@@ -114,6 +130,44 @@ export function PostBody({
 
       {/* 长文才需要回到顶部，所以只在文章页渲染 */}
       <BackToTop />
+    </div>
+  );
+}
+
+/** 字号调节条：三档胶囊按钮，作用于正文、目录与评论区。 */
+function FontSizeControl({
+  currentId,
+  onSelect,
+}: {
+  currentId: FontSizeId;
+  onSelect: (id: FontSizeId) => void;
+}) {
+  const current = FONT_SIZES.find((f) => f.id === currentId) ?? FONT_SIZES[1];
+
+  return (
+    <div className="font-size-control" aria-label="文章字号调节">
+      <p className="reading-width-copy">
+        <span>字号</span>
+      </p>
+
+      <div className="font-size-options" role="radiogroup" aria-label="选择文章字号">
+        {FONT_SIZES.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            role="radio"
+            aria-checked={f.id === currentId}
+            aria-label={f.label}
+            title={`切换为「${f.label}」`}
+            onClick={() => onSelect(f.id)}
+            className={`font-size-option ${f.id === currentId ? "is-active" : ""}`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <span className="sr-only">文章字号：当前{current.label}档</span>
     </div>
   );
 }
