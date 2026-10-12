@@ -17,7 +17,7 @@ export const metadata = {
 - 每条含 `id, parent_id, name, text, admin_badge, pinned, created_at`（ISO 8601），不含 `ip_hash`、`approved` 等内部字段
 - `locked` 表示全站评论锁状态
 
-前端拿到后自行分池：`pinned = 2` 是 AI 总结池、`1` 是置顶池、`0` 是普通时间流，三个池子各自保持倒序、按此顺序渲染。
+前端拿到后自行分池：`pinned = 2` 是 AI 总结池、`1` 是置顶池、`0` 与 `3` 都在普通时间流（`3` 是被取消置顶但保留 AI 标记的总结），三个层级各自保持倒序、按 AI 总结 → 置顶 → 普通的顺序渲染。
 
 ### `POST /api/comments`
 
@@ -45,11 +45,11 @@ export const metadata = {
 
 ### `PATCH /api/admin/comments`
 
-部分更新一条留言，请求体 `{ id, admin_badge?, approved?, pinned? }`，传哪个更新哪个，至少传一个，值严格为 0 或 1：
+部分更新一条留言，请求体 `{ id, admin_badge?, approved?, pinned? }`，传哪个更新哪个，至少传一个，值严格校验：
 
-- `admin_badge`：金色管理员徽标
+- `admin_badge`：金色管理员徽标（0/1）
 - `approved`：审核通过（1）/ 撤回待审（0）
-- `pinned`：置顶开关，**仅顶层留言可置顶**（对回复置顶返回 400）
+- `pinned`：0 普通、1 置顶（仅顶层留言，对回复置顶返回 400）、2 AI 总结置顶、3 AI 总结未置顶。2/3 是 AI 总结的专属状态：只有本来就是 AI 总结的评论可以在两者之间切换，普通留言不能伪造，AI 总结也不许落回 0/1（那会抹掉 AI 身份）
 
 ### `DELETE /api/admin/comments?id=<id>`
 
@@ -83,7 +83,7 @@ export const metadata = {
 | --- | --- | --- |
 | `admin_badge` | 0 / 1 | 金色管理员徽标 |
 | `approved` | 0 / 1 | 审核状态，0 对外不可见 |
-| `pinned` | 0 / 1 / 2 | 0 普通流、1 置顶池、2 AI 总结池 |
+| `pinned` | 0 / 1 / 2 / 3 | 0 普通流、1 置顶池、2 AI 总结（置顶展示）、3 AI 总结（未置顶） |
 
 站点开关存 `settings` 键值表：`comments_locked`（全站评论锁）、`comments_moderation`（审核模式），缺行按「关闭」处理。
 

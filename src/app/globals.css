@@ -726,7 +726,9 @@
     border-radius: 999px;
     background: var(--gold-soft);
     color: var(--gold);
-    font-size: 0.68rem;
+    /* 字号乘 --font-scale：徽标是昵称的一部分，要跟随文章字号档位缩放。
+       后台列表不在 PostBody 内拿不到变量，回退 1，行为不变。 */
+    font-size: calc(0.68rem * var(--font-scale, 1));
     font-weight: 600;
     line-height: 1.5;
     letter-spacing: 0.02em;
@@ -739,6 +741,17 @@
 
   .admin-badge svg {
     flex: none;
+    /* 固定的 width/height 属性在这里用 em 覆盖掉：
+       图标随徽标字号缩放，大字号档下不会变成小图标配大字。 */
+    width: 0.92em;
+    height: 0.92em;
+  }
+
+  /* 置顶/AI 池子标记（TOP、AI）：与 .admin-badge 同理，是昵称的一部分，
+     字号随文章字号档位缩放。后台列表不在 PostBody 内，回退 1 不缩放。 */
+  .pool-tag {
+    font-size: calc(0.75rem * var(--font-scale, 1));
+    line-height: 1.4;
   }
 
   /* 封面底色渐变由 post-card.tsx 的 coverFromSlug 按 slug 生成（内联样式），

@@ -19,8 +19,9 @@
  * 的材料 + 发表通道。两步都刻意不绑定任何 AI 供应商——接入哪个模型、
  * 用什么提示词，是调用方的事；本接口只保证落库的那条评论形状正确。
  *
- * pinned 用 2 而不是再加一列：pinned 本就是「在第几层池子」的语义
- * （0 普通 / 1 置顶 / 2 AI 总结），INTEGER 列直接扩展，前台按值分层渲染。
+ * pinned 用 2/3 两档而不是再加一列：2 = AI 总结置顶展示、
+ * 3 = 被管理员取消置顶（保留 AI 身份，见 admin/comments.js 的 PATCH）。
+ * INTEGER 列直接扩展取值，前台按值分层渲染。
  *
  * 全程要求登录态（/api/admin/* 同款签名 Cookie），响应 no-store。
  */
@@ -38,6 +39,8 @@ import { loadSearchDoc } from "../../_lib/articles.js";
 const AI_SUMMARY_AUTHOR = "AI 总结助手";
 /** AI 总结的置顶层：2 = 比 pinned 1 的置顶池更靠前 */
 const AI_SUMMARY_PINNED = 2;
+/** AI 总结取消置顶后的状态：保留 AI 身份，但回到普通时间流的位置 */
+const AI_SUMMARY_UNPINNED = 3;
 /**
  * AI 评论没有访客 IP，但 ip_hash 列 NOT NULL，写一个自说明的常量占位。
  * 它不会参与限流统计（限流按访客自己的哈希计数），后台列表也从不展示它。
@@ -116,13 +119,14 @@ export async function onRequestPost({ request, env }) {
     return adminJson({ error: `总结最多 ${MAX_TEXT} 字` }, 400);
   }
 
-  // 一篇文章至多一条总结：pinned = 2 就是它的身份标识，
+  // 一篇文章至多一条总结：pinned 2（置顶展示）/ 3（未置顶）都是 AI 总结
+  // 的身份标识（管理员可以取消置顶，但 AI 身份保留），查重两态都要算上。
   // 查重和落库是两次独立查询（无事务），极端并发下最多多插一条，
   // 后台删除即可——为这个概率给 SQLite 上锁不值得。
   const existing = await env.DB.prepare(
-    `SELECT id FROM comments WHERE page = ?1 AND pinned = ?2`,
+    `SELECT id FROM comments WHERE page = ?1 AND pinned IN (?2, ?3)`,
   )
-    .bind(page, AI_SUMMARY_PINNED)
+    .bind(page, AI_SUMMARY_PINNED, AI_SUMMARY_UNPINNED)
     .first();
   if (existing) {
     return adminJson({ error: "该文章已有 AI 总结评论" }, 409);

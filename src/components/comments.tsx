@@ -35,8 +35,9 @@ type Comment = {
   /** 1 = 管理员在后台给这条开了金色徽标。后端恒返回 0/1，不是布尔 */
   admin_badge: number;
   /**
-   * 1 = 置顶，2 = AI 文章总结（比置顶更靠前），0 = 普通。
-   * 后端恒返回 0/1/2，不是布尔；2 只有 AI 总结接口会写。
+   * 1 = 置顶，2 = AI 文章总结（比置顶更靠前），3 = AI 总结但被取消置顶
+   * （保留 AI 标记，位置在普通流），0 = 普通。后端恒返回 0-3，不是布尔；
+   * 2/3 只有 AI 总结接口和针对 AI 评论的管理操作会写。
    */
   pinned: number;
   created_at: string; // ISO 8601（后端已在 SQL 里转好）
@@ -180,6 +181,7 @@ export function Comments({ page }: { page: string }) {
     if (c.parent_id === null) {
       if (c.pinned === 2) aiRoots.push(c);
       else if (c.pinned === 1) pinnedRoots.push(c);
+      // 0 普通、3 = 被取消置顶的 AI 总结：都在普通时间流的位置
       else normalRoots.push(c);
     } else {
       const arr = replyMap.get(c.parent_id);
@@ -359,8 +361,9 @@ export function Comments({ page }: { page: string }) {
    * 请求部分与后台共用（lib/admin-comments.ts），这里保持自己的状态语义：
    * 乐观更新 + 失败回滚 + 401 提示（同 toggleBadge）。后端对回复置顶
    * 返回 400，正常流程到不了——按钮只渲染在顶层留言上。
+   * AI 总结（2/3）只能在置顶与未置顶之间切换，后端会拒绝 0/1。
    */
-  async function togglePinned(id: number, next: 0 | 1) {
+  async function togglePinned(id: number, next: 0 | 1 | 2 | 3) {
     if (pinBusy !== null) return;
     setPinBusy(id);
     setNotice("");
@@ -403,23 +406,23 @@ export function Comments({ page }: { page: string }) {
           {/* 池子标记所有访客可见：AI 总结/置顶排在评论区最前，
               标记说明「它为什么在这里」。主题色 --accent，
               金色 --gold 已被管理员徽标占用，不混用。
-              pinned=2 是 AI 总结，带专用 AI 标记而不是 TOP。 */}
-          {c.pinned === 2 ? (
+              pinned=2/3 都是 AI 总结（后者是被取消置顶的），带专用 AI 标记；
+              字号用 pool-tag 随文章字号档位缩放。 */}
+          {(c.pinned === 2 || c.pinned === 3) && (
             <span
               title="AI 生成的文章总结"
-              className="rounded-full border border-[var(--accent)]/40 px-2 text-xs leading-5 text-[var(--accent)]"
+              className="pool-tag rounded-full border border-[var(--accent)]/40 px-2 text-[var(--accent)]"
             >
               AI
             </span>
-          ) : (
-            c.pinned === 1 && (
-              <span
-                title="博主置顶的留言"
-                className="rounded-full border border-[var(--accent)]/40 px-2 text-xs leading-5 text-[var(--accent)]"
-              >
-                TOP
-              </span>
-            )
+          )}
+          {c.pinned === 1 && (
+            <span
+              title="博主置顶的留言"
+              className="pool-tag rounded-full border border-[var(--accent)]/40 px-2 text-[var(--accent)]"
+            >
+              TOP
+            </span>
           )}
           {/* 徽标跟昵称在同一个 span 里：两者是「谁说的」这一个意思的两半，
               中间那个 gap-x-3（12px）会把它们拆成两组信息。 */}
@@ -452,27 +455,38 @@ export function Comments({ page }: { page: string }) {
             <>
               {/* 置顶开关只在顶层留言上出现（回复没法置顶）。
                   挨着「徽标」放：都是「管理员给这条留言做的标记」，
-                  语义上是一组。开着的状态用主题色文字，和 TOP 标记同色。 */}
+                  语义上是一组。AI 总结（2/3）在置顶与未置顶之间切换，
+                  普通留言在 0/1 之间切换，后端会拒绝跨类的取值。
+                  开着的状态用主题色文字，和 TOP/AI 标记同色。 */}
               {!isReply && (
                 <button
                   type="button"
-                  aria-pressed={Boolean(c.pinned)}
+                  aria-pressed={c.pinned === 1 || c.pinned === 2}
                   disabled={pinBusy === c.id}
-                  onClick={() => togglePinned(c.id, c.pinned ? 0 : 1)}
+                  onClick={() =>
+                    togglePinned(
+                      c.id,
+                      c.pinned === 2 ? 3 : c.pinned === 3 ? 2 : c.pinned ? 0 : 1,
+                    )
+                  }
                   className={`text-xs transition-colors ${
                     c.pinned
                       ? "text-[var(--accent)] hover:text-[var(--accent)]/80"
                       : "text-muted hover:text-[var(--accent)]"
                   }`}
                   title={
-                    c.pinned
-                      ? "点击取消置顶，这条会回到普通时间流"
-                      : "点击置顶这条留言，它会排到评论区最前"
+                    c.pinned === 2
+                      ? "点击取消置顶，回到普通时间流（保留 AI 标记）"
+                      : c.pinned === 3
+                        ? "点击置顶，排到评论区最前的 AI 总结位"
+                        : c.pinned === 1
+                          ? "点击取消置顶，这条会回到普通时间流"
+                          : "点击置顶这条留言，它会排到评论区最前"
                   }
                 >
                   {pinBusy === c.id
                     ? "设置中…"
-                    : c.pinned
+                    : c.pinned === 1 || c.pinned === 2
                       ? "取消置顶"
                       : "置顶"}
                 </button>

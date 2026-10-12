@@ -99,11 +99,13 @@ export async function onRequestGet({ request, env }) {
  *     → { ok, id, admin_badge?, approved?, pinned? }
  *
  * 字段都可选，传哪个更新哪个，但至少传一个；徽标语义走 PATCH 而不是
- * POST（POST 在访客接口那边是「发表」）。值严格校验成 0/1——布尔、字符串
- * 都拒，避免 SQLite 把 truthy 值悄悄存成 1 之外的东西。
- *
- * pinned 只允许置顶层留言（parent_id 为 NULL）：回复在展示层挂在根留言下，
- * 单独置顶一条回复无从安放。
+ * POST（POST 在访客接口那边是「发表」）。pinned 取值 0/1/2/3：
+ *   0 普通、1 置顶（仅顶层留言）、2 AI 总结（置顶展示）、3 AI 总结（未置顶）。
+ * 2/3 是 AI 总结的专属状态：只有本来就是 AI 总结（2/3）的评论可以在
+ * 两者之间切换，普通留言不能伪造，AI 总结也不许落回 0/1——那会抹掉
+ * AI 身份，之后就再也认不出它、也没法放回 AI 池了。
+ * 徽标值严格校验成 0/1——布尔、字符串都拒，避免 SQLite 把 truthy 值
+ * 悄悄存成 1 之外的东西。
  */
 export async function onRequestPatch({ request, env }) {
   if (!(await hasSession(request, env || {}))) {
@@ -131,21 +133,40 @@ export async function onRequestPatch({ request, env }) {
   if (wantsApproved && body.approved !== 0 && body.approved !== 1) {
     return adminJson({ error: "approved 只能是 0 或 1" }, 400);
   }
-  if (wantsPinned && body.pinned !== 0 && body.pinned !== 1) {
-    return adminJson({ error: "pinned 只能是 0 或 1" }, 400);
+  if (
+    wantsPinned &&
+    body.pinned !== 0 &&
+    body.pinned !== 1 &&
+    body.pinned !== 2 &&
+    body.pinned !== 3
+  ) {
+    return adminJson({ error: "pinned 只能是 0、1、2 或 3" }, 400);
   }
 
   // 先确认这条留言存在：D1 的 UPDATE 对不存在的 id 也返回成功（changes: 0），
-  // 不查就会让前端以为开关生效了。parent_id 一并取出来给置顶校验用。
+  // 不查就会让前端以为开关生效了。parent_id / pinned 一并取出来给置顶校验用。
   const existing = await env.DB.prepare(
-    `SELECT id, parent_id FROM comments WHERE id = ?1`,
+    `SELECT id, parent_id, pinned FROM comments WHERE id = ?1`,
   )
     .bind(id)
     .first();
   if (!existing) return adminJson({ error: "留言不存在" }, 404);
 
-  if (wantsPinned && body.pinned === 1 && existing.parent_id !== null) {
-    return adminJson({ error: "只有顶层留言可以置顶" }, 400);
+  if (wantsPinned) {
+    const isAiSummary = existing.pinned === 2 || existing.pinned === 3;
+    if (isAiSummary) {
+      // AI 总结只在「置顶(2)/未置顶(3)」之间切换，见函数头注释
+      if (body.pinned !== 2 && body.pinned !== 3) {
+        return adminJson(
+          { error: "AI 总结的置顶状态只能在置顶与未置顶之间切换" },
+          400,
+        );
+      }
+    } else if (body.pinned === 2 || body.pinned === 3) {
+      return adminJson({ error: "只有 AI 总结评论可以使用该置顶状态" }, 400);
+    } else if (body.pinned === 1 && existing.parent_id !== null) {
+      return adminJson({ error: "只有顶层留言可以置顶" }, 400);
+    }
   }
 
   // 动态拼 SET，传哪个字段更新哪个；值一律走绑定参数

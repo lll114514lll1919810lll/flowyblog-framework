@@ -33,10 +33,10 @@ CREATE TABLE IF NOT EXISTS comments (
   -- 所以伪造不了——能改它的只有带登录态的管理接口。
   admin_badge INTEGER NOT NULL DEFAULT 0,
 
-  -- 置顶标记：1 = 在评论区置顶池展示，0 = 普通时间流。
-  -- 仅顶层留言可为 1（后端 PATCH 强校验）；回复置顶没有意义——
-  -- 回复在展示层挂在根留言下，单独置顶一条回复无从安放。
-  -- 访客发表/伪造不了：写入只走带登录态的管理接口（PATCH /api/admin/comments）。
+  -- 置顶分层：0 = 普通时间流，1 = 置顶池，2 = AI 总结（置顶展示），
+  -- 3 = AI 总结被取消置顶（保留 AI 身份，位置回到普通流）。
+  -- 1 仅限顶层留言；2/3 只有 AI 总结接口和针对 AI 评论的管理操作会写
+  -- （后端 PATCH 强校验，普通留言伪造不了）。
   pinned      INTEGER NOT NULL DEFAULT 0,
 
   text       TEXT NOT NULL,

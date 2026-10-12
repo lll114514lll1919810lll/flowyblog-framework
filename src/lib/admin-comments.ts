@@ -57,8 +57,9 @@ export function patchAdminApproved(id: number, approved: 0 | 1) {
   });
 }
 
-/** 置顶某条顶层留言：1 = 进置顶池，0 = 回普通时间流（PATCH /api/admin/comments） */
-export function patchAdminPinned(id: number, pinned: 0 | 1) {
+/** 置顶某条顶层留言：0 普通、1 置顶、2 AI 总结置顶、3 AI 总结未置顶
+ *（后两者仅限本来就是 AI 总结的评论；PATCH /api/admin/comments） */
+export function patchAdminPinned(id: number, pinned: 0 | 1 | 2 | 3) {
   return adminRequest("/api/admin/comments", {
     method: "PATCH",
     headers: { "content-type": "application/json" },
