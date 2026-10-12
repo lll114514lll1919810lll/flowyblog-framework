@@ -57,8 +57,8 @@ export function SearchPage() {
 
   /* 浏览器前进/后退：URL params 变了，渲染期把表单状态追平（React 官方推荐的
      「用前一次的 props 调 render 期 setState」派生状态模式，不用 effect）。
-     反过来输入变化时 syncUrl 用 router.replace 写回 URL——replace 不堆
-     历史记录，且写入前比较当前值，params→state→replace 不会成环 */
+     反过来输入变化时 syncUrl 用原生 history.replaceState 写回 URL——
+     replace 不堆历史记录，且写入前比较当前值，params→state→replace 不会成环 */
   const urlQ = params.get("q") ?? "";
   const urlTag = params.get("tag") ?? "";
   const [prevUrl, setPrevUrl] = useState({ q: urlQ, tag: urlTag });
@@ -94,9 +94,17 @@ export function SearchPage() {
     if (q) usp.set("q", q);
     if (t) usp.set("tag", t);
     // 不带 page：查询词或标签变了，命中的集合就变了，回到第 1 页才合理
-    const next = usp.size ? `/search?${usp}` : "/search";
-    const current = `${window.location.pathname}${window.location.search}`;
-    if (next !== current) router.replace(next);
+    // 用原生 history.replaceState 而不是 router.replace：搜索页每敲一个字
+    // 都要同步一次 URL，走 router.replace 是一次真实的路由导航——手机浏览器
+    // 上能看到刷新条跑一遍，还会触发 <ViewTransition> 的过渡。replaceState
+    // 是纯本地操作：不发请求、不进历史栈、不触发动画；Next 会把
+    // useSearchParams 与原生 history 保持同步，前进/后退照常可用。
+    // pathname 直接取当前值，天然带上子路径部署的 basePath。
+    const qs = usp.toString();
+    const next = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    if (next !== `${window.location.pathname}${window.location.search}`) {
+      window.history.replaceState(null, "", next);
+    }
   };
 
   const syncUrlSoon = (q: string, t: string) => {
@@ -176,7 +184,10 @@ export function SearchPage() {
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
-              syncUrlSoon(event.target.value.trim(), tag);
+              // 传原始值不 trim：URL 写回后 useSearchParams 会同步，
+              // 派生状态再回写时才能与输入框逐字符一致，不会吃掉
+              // 刚打出来的尾部空格（tokens 计算时自己会 trim）
+              syncUrlSoon(event.target.value, tag);
             }}
             placeholder="输入关键词搜索文章…"
             aria-label="搜索文章"
@@ -220,7 +231,7 @@ export function SearchPage() {
               onClick={() => {
                 const next = tag === t ? "" : t;
                 setTag(next);
-                syncUrl(query.trim(), next);
+                syncUrl(query, next);
               }}
             >
               #{t}
