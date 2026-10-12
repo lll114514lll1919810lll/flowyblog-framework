@@ -8,6 +8,8 @@ FlowyBlog Framework 是一个使用 Next.js、TypeScript、Tailwind CSS 和 MDX 
 
 <https://lll114514lll1919810lll.github.io/flowyblog-framework/>
 
+框架更详细的使用说明（建站流程、站点配置、写作、评论区与后台、主题实验室、部署与常见问题）发布在展示站的文章里，见 [FlowyBlog 使用说明](https://lll114514lll1919810lll.github.io/flowyblog-framework/blog/12-usage-guide)。展示页文档与源码分开授权，采用宽松的 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.zh)，可自由转载、修改与商用（保留署名即可）。
+
 GitHub Pages 构建会关闭依赖 Cloudflare Functions 的评论区。文章、搜索、主题和实验室等静态功能仍然可用。
 
 ## 功能一览
@@ -246,6 +248,7 @@ pnpm preview:cf
 | --- | --- |
 | 主题、组件、配置和脚本等源码 | [AGPL-3.0](./LICENSE) |
 | `src/content/` 中的文章正文 | 框架不声明，由使用者自定（`src/lib/site.ts` 的 `LICENSE.content`，留空即不显示） |
+| 使用说明文档（`https://lll114514lll1919810lll.github.io/flowyblog-framework/blog/*`，即展示站的所有文章） | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.zh)——宽松授权，转载、翻译、改写、商用均可，保留署名即可 |
 | `src/components/liquid-glass/`（第三方） | [AGPL-3.0](https://github.com/martin65536/liquid-glass-webgl) |
 
 源码可以修改和商用，但衍生作品要同样开源，并且通过网络提供服务时要把源码提供给使用者。代码是 AGPL 的原因：框架集成了 [liquid-glass-webgl](https://github.com/martin65536/liquid-glass-webgl)（AGPL-3.0）的液态玻璃渲染器，AGPL 的源码公开义务覆盖整个服务，不能只把那一个组件单独标注，因此全站源码按 AGPL-3.0 发布。

@@ -1,0 +1,121 @@
+export const metadata = {
+  title: "FlowyBlog 使用说明",
+  date: "2026-10-13",
+  description: "框架的详细使用说明：建站流程、站点配置、写作、评论区与后台、主题实验室、部署与常见问题。",
+  tags: ["指南", "框架"],
+}
+
+这是 FlowyBlog Framework 的详细使用说明，与仓库里的 README 互补：README 负责「最快跑起来」，本文负责「每一步还能怎么调、为什么这么设计」。
+
+## 建站总览
+
+推荐路径：**fork 仓库 → clone 到本地 → 跑 WebUI 向导 → 用 AI agent 日常维护**。
+
+不建议下载源码压缩包开跑：fork 之后你才有完整的 Git 历史，提交两个配置文件仓库就变成你自己的站，同时满足 AGPL「向访客提供源码」的义务，还能随时 `git pull` 获取框架更新、走推送自动部署。
+
+建站后更新文章有两条路：
+
+- 本地重跑向导的「构建并发布」步骤（本地构建直传 Cloudflare）
+- 在 Cloudflare Pages 后台把项目连接到你的 Git 仓库，之后 push 即自动部署
+
+## 站点配置：只改一个文件
+
+站名、作者、简介、域名、logo、favicon、导航和仓库地址全部集中在 `src/lib/site.ts`：
+
+| 字段 | 用途 |
+| --- | --- |
+| `name` | 站名，出现在顶栏、标题模板、读屏标签 |
+| `author` | 页脚版权、关于页署名 |
+| `description` | 页脚签名与站点描述 |
+| `logo` | 顶栏左上角 logo；留空使用站名首字的 CSS 渲染 |
+| `favicon` | 浏览器标签页图标，默认 `/favicon.ico` |
+| `url` | 正式域名，sitemap 用 |
+| `github` / `repo` | GitHub 主页与源码仓库，页脚链接 |
+
+两个容易忽略的点：
+
+- `repo` 要改成你自己的仓库地址——AGPL 第 13 条要求向网络使用者提供完整源码，页脚的「源码」链接就是履行方式
+- `LICENSE.content` 默认留空：页脚和关于页不显示内容授权条目，法律上等于保留所有权利。想允许转载就填入协议名和链接（如 CC BY-NC-SA 4.0、CC BY 4.0），会自动显示
+
+logo 和 favicon 都是独立入口：`logo` 填 public 下的图片路径即可圆形裁切展示（`next/image` 在导出构建下输出原图路径，是安全的）；`favicon` 换图片后无需手动处理 URL，框架会自动附加内容版本号并处理子路径部署。
+
+## 写文章
+
+在 `src/content/` 新建 `序号-标题.mdx`，文件名就是文章 URL 的 slug（如 `1-my-first-post.mdx` 对应 `/blog/1-my-first-post`）。文章排序由 metadata 的 `date`（可选 `publishedAt`）倒序决定，文件名序号只影响 slug、不影响排序。
+
+元信息用 MDX 的 `export const metadata`（不是 YAML frontmatter），可用字段：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `title` | 是 | 文章标题，页头渲染，不要在正文再写一级标题 |
+| `date` | 是 | `YYYY-MM-DD`，排序与归档依据 |
+| `publishedAt` | 否 | 精确到分的时间，同一天多篇时用于细分排序 |
+| `description` | 否 | 一句话摘要，列表页展示 |
+| `tags` | 否 | 标签数组，自动生成标签页 |
+| `draft` | 否 | `true` 时不进入列表和构建产物 |
+
+正文能力：
+
+- GFM 表格（自动横向滚动）、任务列表、代码块（带复制按钮）、行内 JSX
+- LaTeX 公式：行内用 `$...$`，独立块用 `$$...$$`，构建期渲染成静态 HTML，无需浏览器端脚本
+- 标题里的行内代码会正确生成锚点（反引号剥掉后再算 slug）
+- 图片放 `public/images/`，正文用绝对路径引用，`alt` 必须写
+
+随附的示例文章覆盖了上述全部写法，跑通后可整批删除：`1-` 到 `10-` 是排版、metadata、部署、主题、LaTeX 等主题的示例，`0-draft-example` 演示草稿（不会出现在站点上）；`11-comment-api` 是评论接口速查、`12-usage-guide` 是本文，属于框架文档，删不删随你。
+
+## 评论区与后台
+
+评论后端是 Cloudflare Pages Functions + D1，支持：
+
+- 访客留言与两层回复，昵称可选（默认「路人」），同 IP 十分钟限 3 条，IP 只存加盐哈希
+- 全站评论锁：后台一键暂停接受新评论，已有留言仍可读
+- 审核模式：开启后新评论待审通过才可见，管理员自己发的豁免
+- 置顶池与 AI 总结：顶层留言可置顶；AI 总结是独立池子，署名「AI 总结助手」，一篇文章至多一条
+- 管理后台：跨文章管理留言、待审核页、管理员徽标、修改留言内容
+
+全部 HTTP 接口、数据库字段与迁移清单见站内文章《评论系统接口一览》（`11-comment-api`），开发新接口或改表时以那篇文章为准。注意后台所有接口都走签名 Cookie 鉴权，管理密钥不出现在 URL 里。
+
+后台入口在页脚，只有已登录管理员可见；登录页是 `/adminlogin`。
+
+## 主题与实验室
+
+明暗双主题跟随系统 + 手动切换，主题属性在首次绘制前由内联脚本写好，不会闪白。
+
+`/lab` 页面提供一组外观实验开关（书本模式、赛博朋克、液态玻璃渲染器等），原理是纯 CSS 令牌覆盖，不侵入组件代码。个别实验有已知兼容限制（如书本模式与液态玻璃同开时后者不生效、赛博朋克锁定夜间模式），说明就写在页面上。想新增实验：在 `src/lib/labs.ts` 注册开关，再到 `globals.css` 加对应令牌覆盖。
+
+## 部署
+
+### Cloudflare Pages（完整功能）
+
+推荐用向导（必须带 `run`，裸 `pnpm setup` 会被 pnpm 内建命令拦截）：
+
+```bash
+pnpm run setup:ui   # 图形界面，逐步引导
+pnpm run setup      # 命令行版，功能相同
+```
+
+向导依次完成：站点配置（自动改写 `site.ts`）→ Cloudflare 授权 → 创建并初始化 D1 → 生成密钥 → 构建发布。全程幂等，中断重跑会跳过已完成步骤，也支持 `--answers` 预填、`--step` 单步、`--json` 事件流。
+
+手动部署时页面构建为纯静态文件（输出目录 `out`）交给 Cloudflare Pages，评论区依赖的环境变量：
+
+| 键 | 用途 |
+| --- | --- |
+| `ADMIN_KEY` | 管理后台登录密钥 |
+| `SESSION_SECRET` | 管理会话签名密钥 |
+| `IP_SALT` | 评论者 IP 哈希的盐 |
+| `ALLOWED_ORIGINS` | 允许调用评论接口的来源（逗号分隔） |
+
+已有数据库按顺序补跑 `db/migrations/` 下的迁移（本地加 `--local`，线上加 `--remote`），漏跑会让对应功能显示「状态未知」或直接报错。
+
+### GitHub Pages（静态演示）
+
+仓库自带工作流，推送 `main` 自动构建发布；basePath 按仓库名自动派生，fork 或改名后不需要改文件。GitHub Pages 构建没有 Cloudflare Functions，评论区不可用，其余功能照常。
+
+## 常见问题
+
+- **typecheck 报 `Cannot find name 'PageProps'`**：全新克隆先跑 `pnpm typegen` 生成路由类型，再 typecheck
+- **改了图片相关代码**：务必跑一次导出构建验证（`NEXT_OUTPUT=export pnpm build`），导出模式下图片优化器是关闭的
+- **`pnpm setup` 被拦**：那是 pnpm 内建命令，必须写 `pnpm run setup`
+- **本地预览评论接口**：`pnpm preview:cf` 用 wrangler 起静态产物 + Functions
+- **Windows 一键起测试服务器**：`pnpm test:server`（可加端口参数）
+- **`.setup/` 与 `.dev.vars`**：内含密钥明文，已在 gitignore，绝不能提交或外发
