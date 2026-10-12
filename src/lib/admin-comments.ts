@@ -57,6 +57,15 @@ export function patchAdminApproved(id: number, approved: 0 | 1) {
   });
 }
 
+/** 置顶某条顶层留言：1 = 进置顶池，0 = 回普通时间流（PATCH /api/admin/comments） */
+export function patchAdminPinned(id: number, pinned: 0 | 1) {
+  return adminRequest("/api/admin/comments", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id, pinned }),
+  });
+}
+
 /** 删除单条留言（级联删回复；DELETE /api/admin/comments?id=） */
 export function deleteAdminComment(id: number) {
   return adminRequest(`/api/admin/comments?id=${id}`, { method: "DELETE" });

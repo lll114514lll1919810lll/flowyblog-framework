@@ -2,7 +2,8 @@
  * 管理后台的数据接口。
  *
  *   GET    /api/admin/comments?limit=&offset=&q=&page=&status=   列出留言（含总数）
- *   PATCH  /api/admin/comments   { id, admin_badge?, approved? }  开关徽标 / 审核通过
+ *   PATCH  /api/admin/comments   { id, admin_badge?, approved?, pinned? }
+ *                                        开关徽标 / 审核通过 / 置顶
  *   DELETE /api/admin/comments?id=<id>                    删除单条（级联删回复）
  *
  * 与面向访客的 /api/comments 分开：
@@ -72,7 +73,7 @@ export async function onRequestGet({ request, env }) {
     .first();
 
   const rows = await env.DB.prepare(
-    `SELECT id, page, parent_id, name, text, admin_badge, approved,
+    `SELECT id, page, parent_id, name, text, admin_badge, approved, pinned,
             strftime('%Y-%m-%dT%H:%M:%SZ', created_at) AS created_at
        FROM comments
        ${whereSql}
@@ -91,14 +92,18 @@ export async function onRequestGet({ request, env }) {
 }
 
 /**
- * 部分更新某条留言：开关管理员徽标（admin_badge）或审核状态（approved）。
+ * 部分更新某条留言：开关管理员徽标（admin_badge）、审核状态（approved）
+ * 或置顶状态（pinned）。
  *
- *   PATCH /api/admin/comments   { id, admin_badge?, approved? }
- *     → { ok, id, admin_badge?, approved? }
+ *   PATCH /api/admin/comments   { id, admin_badge?, approved?, pinned? }
+ *     → { ok, id, admin_badge?, approved?, pinned? }
  *
- * 两个字段都可选，传哪个更新哪个，但至少传一个；徽标语义走 PATCH 而不是
+ * 字段都可选，传哪个更新哪个，但至少传一个；徽标语义走 PATCH 而不是
  * POST（POST 在访客接口那边是「发表」）。值严格校验成 0/1——布尔、字符串
  * 都拒，避免 SQLite 把 truthy 值悄悄存成 1 之外的东西。
+ *
+ * pinned 只允许置顶层留言（parent_id 为 NULL）：回复在展示层挂在根留言下，
+ * 单独置顶一条回复无从安放。
  */
 export async function onRequestPatch({ request, env }) {
   if (!(await hasSession(request, env || {}))) {
@@ -116,7 +121,8 @@ export async function onRequestPatch({ request, env }) {
 
   const wantsBadge = body.admin_badge !== undefined;
   const wantsApproved = body.approved !== undefined;
-  if (!wantsBadge && !wantsApproved) {
+  const wantsPinned = body.pinned !== undefined;
+  if (!wantsBadge && !wantsApproved && !wantsPinned) {
     return adminJson({ error: "没有要更新的字段" }, 400);
   }
   if (wantsBadge && body.admin_badge !== 0 && body.admin_badge !== 1) {
@@ -125,15 +131,22 @@ export async function onRequestPatch({ request, env }) {
   if (wantsApproved && body.approved !== 0 && body.approved !== 1) {
     return adminJson({ error: "approved 只能是 0 或 1" }, 400);
   }
+  if (wantsPinned && body.pinned !== 0 && body.pinned !== 1) {
+    return adminJson({ error: "pinned 只能是 0 或 1" }, 400);
+  }
 
   // 先确认这条留言存在：D1 的 UPDATE 对不存在的 id 也返回成功（changes: 0），
-  // 不查就会让前端以为开关生效了。
+  // 不查就会让前端以为开关生效了。parent_id 一并取出来给置顶校验用。
   const existing = await env.DB.prepare(
-    `SELECT id FROM comments WHERE id = ?1`,
+    `SELECT id, parent_id FROM comments WHERE id = ?1`,
   )
     .bind(id)
     .first();
   if (!existing) return adminJson({ error: "留言不存在" }, 404);
+
+  if (wantsPinned && body.pinned === 1 && existing.parent_id !== null) {
+    return adminJson({ error: "只有顶层留言可以置顶" }, 400);
+  }
 
   // 动态拼 SET，传哪个字段更新哪个；值一律走绑定参数
   const sets = [];
@@ -146,6 +159,10 @@ export async function onRequestPatch({ request, env }) {
     sets.push(`approved = ?${binds.length + 1}`);
     binds.push(body.approved);
   }
+  if (wantsPinned) {
+    sets.push(`pinned = ?${binds.length + 1}`);
+    binds.push(body.pinned);
+  }
   await env.DB.prepare(`UPDATE comments SET ${sets.join(", ")} WHERE id = ?1`)
     .bind(...binds)
     .run();
@@ -155,6 +172,7 @@ export async function onRequestPatch({ request, env }) {
     id,
     ...(wantsBadge ? { admin_badge: body.admin_badge } : {}),
     ...(wantsApproved ? { approved: body.approved } : {}),
+    ...(wantsPinned ? { pinned: body.pinned } : {}),
   });
 }
 

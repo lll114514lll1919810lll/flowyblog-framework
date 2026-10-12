@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AdminBadge } from "@/components/admin-badge";
-import { deleteAdminComment, patchAdminBadge } from "@/lib/admin-comments";
+import { deleteAdminComment, patchAdminBadge, patchAdminPinned } from "@/lib/admin-comments";
 import { refreshAdminSession, useIsAdmin } from "@/lib/admin-session";
 import { absoluteTime, relativeTime } from "@/lib/time";
 
@@ -34,6 +34,11 @@ type Comment = {
   text: string;
   /** 1 = 管理员在后台给这条开了金色徽标。后端恒返回 0/1，不是布尔 */
   admin_badge: number;
+  /**
+   * 1 = 置顶，2 = AI 文章总结（比置顶更靠前），0 = 普通。
+   * 后端恒返回 0/1/2，不是布尔；2 只有 AI 总结接口会写。
+   */
+  pinned: number;
   created_at: string; // ISO 8601（后端已在 SQL 里转好）
 };
 
@@ -78,6 +83,9 @@ export function Comments({ page }: { page: string }) {
 
   /** 徽标开关正在提交的那条 id（同一时刻只允许一个在飞，避免连点乱序） */
   const [badgeBusy, setBadgeBusy] = useState<number | null>(null);
+
+  /** 置顶开关正在提交的那条 id（同一时刻只允许一个在飞，避免连点乱序） */
+  const [pinBusy, setPinBusy] = useState<number | null>(null);
 
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -157,15 +165,22 @@ export function Comments({ page }: { page: string }) {
   /* ------------------------------------------------------------ 分组 --- */
 
   /*
-   * 后端返回的是扁平列表（id 倒序 = 新在前），这里分成顶层和回复两层。
+   * 后端返回的是扁平列表（id 倒序 = 新在前），这里分成四个部分：
+   * 顶层 AI 总结池（pinned=2）、置顶池（pinned=1）、普通池、回复层。
+   * 三个顶层池子各自保持后端给的 id 倒序（新在前），
+   * 渲染顺序：AI 总结 → 置顶 → 普通。
    * 回复只做两层：后端已经把「回复的回复」归一到根留言，
    * 所以 replyMap 的键一定是顶层留言的 id。
    */
-  const roots: Comment[] = [];
+  const aiRoots: Comment[] = [];
+  const pinnedRoots: Comment[] = [];
+  const normalRoots: Comment[] = [];
   const replyMap = new Map<number, Comment[]>();
   for (const c of comments) {
     if (c.parent_id === null) {
-      roots.push(c);
+      if (c.pinned === 2) aiRoots.push(c);
+      else if (c.pinned === 1) pinnedRoots.push(c);
+      else normalRoots.push(c);
     } else {
       const arr = replyMap.get(c.parent_id);
       if (arr) arr.push(c);
@@ -338,15 +353,74 @@ export function Comments({ page }: { page: string }) {
     }
   }
 
+  /**
+   * 置顶/取消置顶某条顶层留言。
+   *
+   * 请求部分与后台共用（lib/admin-comments.ts），这里保持自己的状态语义：
+   * 乐观更新 + 失败回滚 + 401 提示（同 toggleBadge）。后端对回复置顶
+   * 返回 400，正常流程到不了——按钮只渲染在顶层留言上。
+   */
+  async function togglePinned(id: number, next: 0 | 1) {
+    if (pinBusy !== null) return;
+    setPinBusy(id);
+    setNotice("");
+
+    const prev = comments;
+    setComments((list) =>
+      list.map((c) => (c.id === id ? { ...c, pinned: next } : c)),
+    );
+
+    try {
+      const r = await patchAdminPinned(id, next);
+      if (r.ok) return;
+
+      setComments(prev);
+      if (r.status === 401) {
+        void refreshAdminSession();
+        setNotice("登录已失效，请重新登录后再试");
+      } else if (r.status === 0) {
+        setNotice("网络异常，置顶设置失败");
+      } else {
+        setNotice(r.error || "置顶设置失败");
+      }
+    } finally {
+      setPinBusy(null);
+    }
+  }
+
   /* ------------------------------------------------------------ 渲染 --- */
 
-  /** 单条留言的头部：昵称、时间、回复与管理操作 */
-  function renderMeta(c: Comment) {
+  /**
+   * 单条留言的头部：昵称、时间、回复与管理操作。
+   * isReply 用来区分顶层/回复：置顶标记和置顶按钮只出现在顶层留言上。
+   */
+  function renderMeta(c: Comment, isReply: boolean) {
     return (
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         {/* 字号继承 .comment-item，随文章字号档位缩放 */}
         <span className="flex items-baseline gap-1.5 font-medium">
           {c.name}
+          {/* 池子标记所有访客可见：AI 总结/置顶排在评论区最前，
+              标记说明「它为什么在这里」。主题色 --accent，
+              金色 --gold 已被管理员徽标占用，不混用。
+              pinned=2 是 AI 总结，带专用 AI 标记而不是 TOP。 */}
+          {c.pinned === 2 ? (
+            <span
+              title="AI 生成的文章总结"
+              className="rounded-full border border-[var(--accent)]/40 px-2 text-xs leading-5 text-[var(--accent)]"
+            >
+              AI
+            </span>
+          ) : (
+            c.pinned === 1 && (
+              <span
+                title="博主置顶的留言"
+                className="rounded-full border border-[var(--accent)]/40 px-2 text-xs leading-5 text-[var(--accent)]"
+              >
+                TOP
+              </span>
+            )
+          )}
           {/* 徽标跟昵称在同一个 span 里：两者是「谁说的」这一个意思的两半，
               中间那个 gap-x-3（12px）会把它们拆成两组信息。 */}
           {Boolean(c.admin_badge) && <AdminBadge />}
@@ -376,6 +450,34 @@ export function Comments({ page }: { page: string }) {
 
           {isAdmin && (
             <>
+              {/* 置顶开关只在顶层留言上出现（回复没法置顶）。
+                  挨着「徽标」放：都是「管理员给这条留言做的标记」，
+                  语义上是一组。开着的状态用主题色文字，和 TOP 标记同色。 */}
+              {!isReply && (
+                <button
+                  type="button"
+                  aria-pressed={Boolean(c.pinned)}
+                  disabled={pinBusy === c.id}
+                  onClick={() => togglePinned(c.id, c.pinned ? 0 : 1)}
+                  className={`text-xs transition-colors ${
+                    c.pinned
+                      ? "text-[var(--accent)] hover:text-[var(--accent)]/80"
+                      : "text-muted hover:text-[var(--accent)]"
+                  }`}
+                  title={
+                    c.pinned
+                      ? "点击取消置顶，这条会回到普通时间流"
+                      : "点击置顶这条留言，它会排到评论区最前"
+                  }
+                >
+                  {pinBusy === c.id
+                    ? "设置中…"
+                    : c.pinned
+                      ? "取消置顶"
+                      : "置顶"}
+                </button>
+              )}
+
               {/* 徽标开关挨着「删除」放：管理员在文章页写完自己的回复，
                   顺手标一下就行，不必跳去 /admin 再搜那条。
                   开着的状态用金色文字，和昵称旁的徽标同一颜色，
@@ -506,7 +608,7 @@ export function Comments({ page }: { page: string }) {
               : "comment-item panel-raised panel rounded-[var(--radius-panel)] px-4 py-4"
           }
         >
-          {renderMeta(c)}
+          {renderMeta(c, isReply)}
           {/* whitespace-pre-wrap 保留用户输入的换行；
               break-words 防止超长无空格串（URL）撑破面板。
               字号继承 .comment-item，随文章字号档位缩放 */}
@@ -671,9 +773,33 @@ export function Comments({ page }: { page: string }) {
         <p className="mt-6 text-sm text-muted">还没有留言，来做第一个。</p>
       )}
 
-      {status === "ready" && roots.length > 0 && (
+      {status === "ready" && aiRoots.length > 0 && (
         <ul className="mt-6 flex flex-col gap-4">
-          {roots.map((c) => (
+          {aiRoots.map((c) => (
+            <li key={c.id}>{renderComment(c, false)}</li>
+          ))}
+        </ul>
+      )}
+
+      {status === "ready" && pinnedRoots.length > 0 && (
+        <ul
+          className={`flex flex-col gap-4 ${
+            aiRoots.length > 0 ? "mt-4" : "mt-6"
+          }`}
+        >
+          {pinnedRoots.map((c) => (
+            <li key={c.id}>{renderComment(c, false)}</li>
+          ))}
+        </ul>
+      )}
+
+      {status === "ready" && normalRoots.length > 0 && (
+        <ul
+          className={`flex flex-col gap-4 ${
+            aiRoots.length > 0 || pinnedRoots.length > 0 ? "mt-4" : "mt-6"
+          }`}
+        >
+          {normalRoots.map((c) => (
             <li key={c.id}>{renderComment(c, false)}</li>
           ))}
         </ul>

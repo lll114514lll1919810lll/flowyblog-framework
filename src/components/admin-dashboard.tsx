@@ -25,6 +25,8 @@ type AdminComment = {
   admin_badge: number;
   /** 0 = 待审核（审核模式下新访客评论），1 = 已通过。后端恒返回 0/1 */
   approved: number;
+  /** 1 = 置顶，2 = AI 文章总结（比置顶更靠前），0 = 普通。后端恒返回 0/1/2 */
+  pinned: number;
   created_at: string;
 };
 
@@ -445,6 +447,18 @@ export function AdminDashboard() {
                   {c.approved === 0 && (
                     <span className="rounded-full border border-[var(--gold)]/40 px-2 text-xs leading-5 text-[var(--gold)]">
                       待审核
+                    </span>
+                  )}
+                  {/* 置顶是状态展示：操作入口在文章评论区，这里只让管理员
+                      知道这条挂在哪个池子里（2 = AI 总结，1 = 置顶） */}
+                  {c.pinned === 2 && (
+                    <span className="rounded-full border border-[var(--accent)]/40 px-2 text-xs leading-5 text-[var(--accent)]">
+                      AI
+                    </span>
+                  )}
+                  {c.pinned === 1 && (
+                    <span className="rounded-full border border-[var(--accent)]/40 px-2 text-xs leading-5 text-[var(--accent)]">
+                      TOP
                     </span>
                   )}
                 </span>

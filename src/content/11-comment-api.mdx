@@ -1,0 +1,92 @@
+export const metadata = {
+  title: "评论系统接口一览",
+  date: "2026-10-12",
+  description: "评论系统的全部 HTTP 接口、数据库字段与调用约定，开发新接口时同步更新本文。",
+  tags: ["指南", "框架"],
+}
+
+评论后端运行在 Cloudflare Pages Functions 上（`functions/` 目录），数据库是 D1。本文是全部接口的速查表——**以后每新增或修改一个接口，都应同步更新这篇文章**，让读者始终能在同一处看到全貌。
+
+## 访客接口（无需登录）
+
+### `GET /api/comments?page=<slug>`
+
+列出某篇文章的评论。返回 `{ items, locked }`：
+
+- `items` 只含已通过审核（`approved = 1`）的评论，按 id 倒序，最多 200 条
+- 每条含 `id, parent_id, name, text, admin_badge, pinned, created_at`（ISO 8601），不含 `ip_hash`、`approved` 等内部字段
+- `locked` 表示全站评论锁状态
+
+前端拿到后自行分池：`pinned = 2` 是 AI 总结池、`1` 是置顶池、`0` 是普通时间流，三个池子各自保持倒序、按此顺序渲染。
+
+### `POST /api/comments`
+
+发表评论或回复，请求体 `{ page, name, text, parent_id? }`：
+
+- 昵称可留空，默认「路人」；内容最多 500 字（按码点计数，emoji 不算双倍）
+- 回复只做两层，`parent_id` 会被后端归一到顶层留言
+- 同一 IP 十分钟内最多 3 条；IP 只存加盐哈希，绝不存原文
+- 审核模式开启时，访客新评论以 `approved = 0` 入库、前台不可见，响应带 `pending: true`
+- 管理员登录态发表的评论豁免审核，`pending` 为 `false`
+
+## 管理接口（需登录态）
+
+全部挂在 `/api/admin/*` 下，用签名 Cookie（`fbz_admin`）鉴权，未登录一律 401，响应一律禁止缓存。
+
+### 登录与会话
+
+- `POST /api/admin/login`，请求体 `{ key }`：校验 `ADMIN_KEY`，下发 HttpOnly Cookie，有效期 7 天
+- `DELETE /api/admin/login`：退出登录
+- `GET /api/admin/session`：探测当前登录态
+
+### `GET /api/admin/comments?limit=&offset=&q=&page=&status=`
+
+跨文章列出全部留言（含待审核），带 `total/limit/offset` 分页信息。`q` 搜索昵称/内容/文章标识，`status=pending` 只看待审核。
+
+### `PATCH /api/admin/comments`
+
+部分更新一条留言，请求体 `{ id, admin_badge?, approved?, pinned? }`，传哪个更新哪个，至少传一个，值严格为 0 或 1：
+
+- `admin_badge`：金色管理员徽标
+- `approved`：审核通过（1）/ 撤回待审（0）
+- `pinned`：置顶开关，**仅顶层留言可置顶**（对回复置顶返回 400）
+
+### `DELETE /api/admin/comments?id=<id>`
+
+删除一条留言；若是顶层留言，其下回复级联删除（单事务）。
+
+### `GET /api/admin/settings`
+
+返回 `{ comments_locked, comments_moderation, pending_count }` 两个站点开关和待审核数量。
+
+### `PATCH /api/admin/settings`
+
+拨开关，请求体 `{ comments_locked?, comments_moderation? }`，传哪个写哪个。写失败返回 500 并提示先跑迁移。
+
+### `GET /api/admin/ai-review?id=<评论id>`
+
+**AI 审核上下文接口**（只提供材料，不连接 AI）：返回待审评论本体、它回复的父评论、文章摘要、同篇已通过评论（最近 20 条）。调用方把这份上下文交给任意 AI，AI 约定返回 `{ approved: 0|1, reason }`，再走上面的 PATCH 落库。
+
+### `GET /api/admin/ai-summary?page=<slug>` 与 `POST /api/admin/ai-summary`
+
+**AI 文章总结接口**（只提供材料与落库，不连接 AI）：
+
+- GET 返回总结任务包：文章全文（截断到 8000 字）、署名/置顶/字数契约、`existing_summary_id`
+- POST 请求体 `{ page, summary }`，把 AI 生成的总结直接落成评论：署名「AI 总结助手」、`pinned = 2`、`approved = 1`
+- 一篇文章至多一条总结，重复提交返回 409
+
+## 数据库要点
+
+`comments` 表的关键列：
+
+| 列 | 取值 | 含义 |
+| --- | --- | --- |
+| `admin_badge` | 0 / 1 | 金色管理员徽标 |
+| `approved` | 0 / 1 | 审核状态，0 对外不可见 |
+| `pinned` | 0 / 1 / 2 | 0 普通流、1 置顶池、2 AI 总结池 |
+
+站点开关存 `settings` 键值表：`comments_locked`（全站评论锁）、`comments_moderation`（审核模式），缺行按「关闭」处理。
+
+## 迁移
+
+`db/schema.sql` 负责全新安装；已有库按 `db/migrations/` 顺序升级，目前到 `0005-add-pinned.sql`。新接口如果需要改表，**新增一个迁移文件**而不是改旧文件，并在这张清单里追加一行。

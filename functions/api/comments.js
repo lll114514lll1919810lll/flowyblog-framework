@@ -65,10 +65,13 @@ async function handle(request, env, url) {
     // 而写入只走管理接口（PATCH /api/admin/comments）。
     // 下面的 INSERT 刻意不列这一列——新留言永远是 0，请求体伪造不了。
     //
+    // pinned 同理对外可读、不可写：前端据此把顶层留言分成置顶/普通两个池子
+    // （置顶池排前面，各自保持这里的 id 倒序）。
+    //
     // approved = 1：审核模式下待审的评论（approved = 0）对外不可见，
     // 只在后台待审核页（/api/admin/comments?status=pending）里出现。
     const res = await env.DB.prepare(
-      `SELECT id, parent_id, name, text, admin_badge,
+      `SELECT id, parent_id, name, text, admin_badge, pinned,
               strftime('%Y-%m-%dT%H:%M:%SZ', created_at) AS created_at
          FROM ${TABLE}
         WHERE page = ?1 AND approved = 1
