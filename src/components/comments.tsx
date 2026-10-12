@@ -177,12 +177,16 @@ export function Comments({ page }: { page: string }) {
 
   /* ------------------------------------------------------------ 动作 --- */
 
-  /** 发表（顶层或回复共用）。返回错误信息，null 表示成功。 */
+  /**
+   * 发表（顶层或回复共用）。
+   * error 非空表示失败；pending = 服务端开了审核模式、这条进了待审核队列
+   * （管理员自己发的会被豁免，pending 为 false）。
+   */
   async function post(payload: {
     name: string;
     text: string;
     parentId: number | null;
-  }): Promise<string | null> {
+  }): Promise<{ error: string | null; pending: boolean }> {
     const res = await fetch("/api/comments", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -194,8 +198,12 @@ export function Comments({ page }: { page: string }) {
       }),
     });
     const body = await res.json().catch(() => null);
-    if (!res.ok) return body?.error || "提交失败，请稍后再试";
-    return null;
+    if (!res.ok)
+      return {
+        error: body?.error || "提交失败，请稍后再试",
+        pending: false,
+      };
+    return { error: null, pending: Boolean(body?.pending) };
   }
 
   async function onSubmit(event: React.FormEvent) {
@@ -212,13 +220,15 @@ export function Comments({ page }: { page: string }) {
     setSubmitting(true);
     setNotice("");
     try {
-      const err = await post({ name, text: trimmed, parentId: null });
-      if (err) {
-        setNotice(err);
+      const result = await post({ name, text: trimmed, parentId: null });
+      if (result.error) {
+        setNotice(result.error);
         return;
       }
       setText("");
-      setNotice("留言成功");
+      setNotice(
+        result.pending ? "已提交，等待博主审核后才会显示" : "留言成功",
+      );
       setReloadKey((k) => k + 1);
     } catch {
       setNotice("提交失败，请检查网络后重试");
@@ -241,19 +251,21 @@ export function Comments({ page }: { page: string }) {
     setReplySubmitting(true);
     setNotice("");
     try {
-      const err = await post({
+      const result = await post({
         name: replyName,
         text: trimmed,
         parentId: replyTo,
       });
-      if (err) {
-        setNotice(err);
+      if (result.error) {
+        setNotice(result.error);
         return;
       }
       setReplyText("");
       setReplyName("");
       setReplyTo(null);
-      setNotice("回复成功");
+      setNotice(
+        result.pending ? "已提交，等待博主审核后才会显示" : "回复成功",
+      );
       setReloadKey((k) => k + 1);
     } catch {
       setNotice("提交失败，请检查网络后重试");

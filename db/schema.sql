@@ -35,6 +35,12 @@ CREATE TABLE IF NOT EXISTS comments (
 
   text       TEXT NOT NULL,
 
+  -- 审核状态：1 = 通过（对外可见），0 = 待审核。
+  -- 仅当后台开启「审核模式」时，新访客评论才以 0 入库；
+  -- 管理员登录态发表的评论、以及审核模式关闭期间的一切评论都是 1。
+  -- 访客发表时伪造不了：POST /api/comments 的 INSERT 按服务端开关状态写这一列。
+  approved   INTEGER NOT NULL DEFAULT 1,
+
   -- 访客 IP 的加盐哈希，仅用于限流，不存原始 IP。
   -- 见 functions/_lib/api.js 的 ipHashOf()。
   ip_hash    TEXT NOT NULL,
@@ -55,8 +61,9 @@ CREATE INDEX IF NOT EXISTS idx_comments_ip_created
 -- 删除顶层留言时要级联删掉它的回复，按 parent_id 找子项需要索引。
 CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments (parent_id);
 
--- 站点开关。存「后台可改、需要跨部署保留」的那类状态，目前只有一项：
---   comments_locked  "1" = 全站锁定，不接受新评论
+-- 站点开关。存「后台可改、需要跨部署保留」的那类状态，目前有两项：
+--   comments_locked      "1" = 全站锁定，不接受新评论
+--   comments_moderation  "1" = 审核模式，新评论须审核通过才可见
 --
 -- 为什么不放环境变量：改了要重新部署才生效，而且 functions 没有写入口，
 -- 后台点一下开关必须当场落库。

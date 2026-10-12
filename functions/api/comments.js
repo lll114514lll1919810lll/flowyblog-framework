@@ -8,6 +8,10 @@
  * locked 标记，POST 一律 403。已有留言仍然可读——锁的是「不接受新评论」，
  * 不是把评论区整块藏起来。
  *
+ * 审核模式（后台 /admin 可拨）打开时，访客新评论以 approved = 0 入库，
+ * GET 只返回 approved = 1 的评论；管理员在后台「待审核」页通过后才可见。
+ * 带管理员登录态的 POST 豁免审核——博主不用审核自己发的回复。
+ *
  * 管理员删除留言走 /api/admin/comments（登录态鉴权），本接口不暴露
  * 任何管理通道——管理密钥出现在 URL 里有日志泄漏风险。
  *
@@ -21,8 +25,10 @@
 
 import {
   commentsLocked,
+  commentsModeration,
   countRecent,
   createHandlers,
+  hasSession,
   ipHashOf,
   json,
   LIST_LIMIT,
@@ -58,11 +64,14 @@ async function handle(request, env, url) {
     // admin_badge 对外可读、不可写：访客界面靠它渲染金色徽标，
     // 而写入只走管理接口（PATCH /api/admin/comments）。
     // 下面的 INSERT 刻意不列这一列——新留言永远是 0，请求体伪造不了。
+    //
+    // approved = 1：审核模式下待审的评论（approved = 0）对外不可见，
+    // 只在后台待审核页（/api/admin/comments?status=pending）里出现。
     const res = await env.DB.prepare(
       `SELECT id, parent_id, name, text, admin_badge,
               strftime('%Y-%m-%dT%H:%M:%SZ', created_at) AS created_at
          FROM ${TABLE}
-        WHERE page = ?1
+        WHERE page = ?1 AND approved = 1
         ORDER BY id DESC
         LIMIT ${LIST_LIMIT}`,
     )
@@ -136,14 +145,27 @@ async function handle(request, env, url) {
       );
     }
 
+    /*
+      审核模式：开启后访客的新评论以 approved = 0 入库，
+      在后台「待审核」页通过之前对外不可见。
+
+      管理员登录态豁免：博主在文章页回复自己的评论不该被自己审核，
+      所以带有效会话的请求直接 approved = 1。hasSession 是纯 HMAC 验签、
+      不查库，代价可忽略；验不过就按访客处理，不影响任何现有行为。
+    */
+    const isAdmin = await hasSession(request, env);
+    const moderated = !isAdmin && (await commentsModeration(env.DB));
+
     await env.DB.prepare(
-      `INSERT INTO ${TABLE} (page, parent_id, name, text, ip_hash)
-       VALUES (?1, ?2, ?3, ?4, ?5)`,
+      `INSERT INTO ${TABLE} (page, parent_id, name, text, ip_hash, approved)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
     )
-      .bind(page, parentId, name, text, ipHash)
+      .bind(page, parentId, name, text, ipHash, moderated ? 0 : 1)
       .run();
 
-    return json({ ok: true }, 200, origin);
+    // pending 回给前端：审核模式下提示「已提交，等待审核」，
+    // 而不是「留言成功」——否则访客会疑惑「发成功了怎么看不到」。
+    return json({ ok: true, pending: moderated }, 200, origin);
   }
 
   return json({ error: "不支持的请求方法" }, 405, origin);

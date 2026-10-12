@@ -1,8 +1,9 @@
 /**
  * 管理评论接口的共用请求封装。
  *
- * 评论区组件（comments.tsx）和后台面板（admin-dashboard.tsx）都要调
- * PATCH 徽标 / DELETE 留言这两个接口，请求与错误解析只写这一份；
+ * 评论区组件（comments.tsx）、后台面板（admin-dashboard.tsx）和待审核页
+ * （admin-pending.tsx）都要调 PATCH 徽标 / PATCH 审核 / DELETE 留言这几个接口，
+ * 请求与错误解析只写这一份；
  * 乐观更新、状态回滚、401 之后的界面处理（提示 vs 跳登录页）差异较大，
  * 归各组件自己处理。
  */
@@ -44,6 +45,15 @@ export function patchAdminBadge(id: number, adminBadge: 0 | 1) {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ id, admin_badge: adminBadge }),
+  });
+}
+
+/** 审核某条留言：1 = 通过（对外可见），0 = 撤回待审（PATCH /api/admin/comments） */
+export function patchAdminApproved(id: number, approved: 0 | 1) {
+  return adminRequest("/api/admin/comments", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id, approved }),
   });
 }
 

@@ -23,6 +23,8 @@ type AdminComment = {
   text: string;
   /** 1 = 这条昵称旁显示金色管理员徽标。后端恒返回 0/1，不是布尔 */
   admin_badge: number;
+  /** 0 = 待审核（审核模式下新访客评论），1 = 已通过。后端恒返回 0/1 */
+  approved: number;
   created_at: string;
 };
 
@@ -61,8 +63,16 @@ export function AdminDashboard() {
 
   /** 全站评论锁。null = 还没读到（后端没有 settings 表时也是这个） */
   const [commentsLocked, setCommentsLocked] = useState<boolean | null>(null);
+  /** 审核模式。null = 还没读到 */
+  const [commentsModeration, setCommentsModeration] = useState<boolean | null>(
+    null,
+  );
+  /** 待审核条数（后台「待审核」入口角标）。null = 还没读到 */
+  const [pendingCount, setPendingCount] = useState<number | null>(null);
   /** 锁的写入正在进行，用来挡住连点 */
   const [lockBusy, setLockBusy] = useState(false);
+  /** 审核开关的写入正在进行 */
+  const [moderationBusy, setModerationBusy] = useState(false);
 
   // 搜索防抖：每敲一个字就请求一次太浪费，等停手 300ms 再查
   useEffect(() => {
@@ -123,13 +133,13 @@ export function AdminDashboard() {
   }, [offset, query, reloadKey, router]);
 
   /*
-    全站评论锁单独一个 effect。
+    站点开关 + 待审核数单独一个 effect。
 
-    它是站点级的状态，不随分页、搜索、翻页变化，塞进上面那个列表请求里
-    只会在每次换页时多发一次。reloadKey 带上是为了「重试」按钮能一并刷新它。
+    它们是站点级的状态，不随分页、搜索、翻页变化，塞进上面那个列表请求里
+    只会在每次换页时多发一次。reloadKey 带上是为了「重试」按钮能一并刷新。
 
     读失败不报错、只把开关显示成「未知」：这个接口是后加的，老库没有
-    settings 表时会返回 500，此时留言列表功能照常，不该被一个附属开关拖累。
+    settings 表时会返回 500，此时留言列表功能照常，不该被附属开关拖累。
   */
   useEffect(() => {
     const controller = new AbortController();
@@ -142,14 +152,22 @@ export function AdminDashboard() {
         });
         if (!res.ok) {
           setCommentsLocked(null);
+          setCommentsModeration(null);
+          setPendingCount(null);
           return;
         }
         const body = await res.json().catch(() => null);
         if (controller.signal.aborted) return;
         setCommentsLocked(Boolean(body?.comments_locked));
+        setCommentsModeration(Boolean(body?.comments_moderation));
+        setPendingCount(
+          typeof body?.pending_count === "number" ? body.pending_count : null,
+        );
       } catch {
         if (controller.signal.aborted) return;
         setCommentsLocked(null);
+        setCommentsModeration(null);
+        setPendingCount(null);
       }
     })();
 
@@ -157,24 +175,27 @@ export function AdminDashboard() {
   }, [reloadKey]);
 
   /**
-   * 拨全站评论锁。
+   * 拨站点开关（全站评论锁 / 审核模式共用）。
    *
    * 乐观更新 + 失败回滚，和徽标开关同一套做法：这是个开关，点了就该立刻
-   * 看到状态变了。回滚是必须的——锁的状态显示错了，管理员会以为评论已经
-   * 关掉（或者已经打开），而实际行为和屏幕上的相反。
+   * 看到状态变了。回滚是必须的——开关的状态显示错了，管理员会以为设置已经
+   * 生效（或者已经关闭），而实际行为和屏幕上的相反。
    */
-  async function toggleCommentsLock() {
-    if (lockBusy || commentsLocked === null) return;
-    const next = !commentsLocked;
-    setLockBusy(true);
-    setCommentsLocked(next);
+  async function toggleSwitch(
+    field: "comments_locked" | "comments_moderation",
+    next: boolean,
+    set: (v: boolean | null) => void,
+    setBusy: (b: boolean) => void,
+  ) {
+    setBusy(true);
+    set(next);
     setError("");
 
     try {
       const res = await fetch("/api/admin/settings", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ comments_locked: next }),
+        body: JSON.stringify({ [field]: next }),
       });
       if (res.status === 401) {
         router.replace("/adminlogin");
@@ -182,22 +203,41 @@ export function AdminDashboard() {
       }
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        setCommentsLocked(!next); // 回滚
+        set(!next); // 回滚
         setError(body?.error || "开关没保存上，已还原");
         return;
       }
       const body = await res.json().catch(() => null);
       // 以服务端为准再对一次：万一并发被别处改过，界面不该停在本地值
-      if (typeof body?.comments_locked === "boolean") {
-        setCommentsLocked(body.comments_locked);
-      }
+      const applied = body?.[field];
+      if (typeof applied === "boolean") set(applied);
     } catch {
-      setCommentsLocked(!next);
+      set(!next);
       setError("网络异常，开关没保存上，已还原");
     } finally {
-      setLockBusy(false);
+      setBusy(false);
     }
   }
+
+  const toggleCommentsLock = () => {
+    if (lockBusy || commentsLocked === null) return;
+    return toggleSwitch(
+      "comments_locked",
+      !commentsLocked,
+      setCommentsLocked,
+      setLockBusy,
+    );
+  };
+
+  const toggleCommentsModeration = () => {
+    if (moderationBusy || commentsModeration === null) return;
+    return toggleSwitch(
+      "comments_moderation",
+      !commentsModeration,
+      setCommentsModeration,
+      setModerationBusy,
+    );
+  };
 
   async function remove(id: number) {
     setDeleting(true);
@@ -284,6 +324,17 @@ export function AdminDashboard() {
             </h1>
             <p className="mt-2 text-sm text-secondary">
               {loading ? "加载中…" : `共 ${total} 条${query ? "（已筛选）" : ""}`}
+              {pendingCount !== null && (
+                <>
+                  {" · "}
+                  <Link
+                    href="/admin/pending"
+                    className="underline underline-offset-2 hover:text-accent"
+                  >
+                    待审核 {pendingCount} 条
+                  </Link>
+                </>
+              )}
             </p>
           </div>
           <button type="button" onClick={logout} className="btn-pill">
@@ -306,33 +357,61 @@ export function AdminDashboard() {
         />
 
         {/*
-          全站评论锁。放在这里而不是单独一块面板：它是「评论管理」的一个
-          属性，和搜索、列表是同一件事的三面，拆开反而看不出它管的是什么。
+          两个站点开关。放在这里而不是单独一块面板：它们是「评论管理」的
+          属性，和搜索、列表是同一件事的几面，拆开反而看不出管的是什么。
         */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--lab-divider)] pt-4">
-          <div className="flex flex-col gap-1">
-            <span className="text-sm font-medium">接受新评论</span>
-            <span className="text-xs leading-relaxed text-muted">
-              {commentsLocked === null
-                ? "状态未知：后端没有 settings 表（需要跑 db/migrations/0003-add-settings.sql）。"
-                : commentsLocked
-                  ? "已暂停——所有文章都不接受新评论，已有留言仍可读。"
-                  : "正常接受新评论。"}
-            </span>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--lab-divider)] pt-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-medium">接受新评论</span>
+              <span className="text-xs leading-relaxed text-muted">
+                {commentsLocked === null
+                  ? "状态未知：后端没有 settings 表（需要跑 db/migrations/0003-add-settings.sql）。"
+                  : commentsLocked
+                    ? "已暂停——所有文章都不接受新评论，已有留言仍可读。"
+                    : "正常接受新评论。"}
+              </span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={commentsLocked === false}
+              aria-label="接受新评论"
+              disabled={commentsLocked === null || lockBusy}
+              onClick={toggleCommentsLock}
+              className="lab-switch"
+            >
+              <span className="lab-switch-track">
+                <span className="lab-switch-knob" />
+              </span>
+            </button>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={commentsLocked === false}
-            aria-label="接受新评论"
-            disabled={commentsLocked === null || lockBusy}
-            onClick={toggleCommentsLock}
-            className="lab-switch"
-          >
-            <span className="lab-switch-track">
-              <span className="lab-switch-knob" />
-            </span>
-          </button>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--lab-divider)] pt-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-medium">审核模式</span>
+              <span className="text-xs leading-relaxed text-muted">
+                {commentsModeration === null
+                  ? "状态未知：后端没有 settings 表（需要跑 db/migrations/0003-add-settings.sql）。"
+                  : commentsModeration
+                    ? "已开启——新评论要你在待审核页通过后才会显示（你自己发的回复不受影响）。"
+                    : "新评论直接显示，无需审核。"}
+              </span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={commentsModeration === true}
+              aria-label="审核模式"
+              disabled={commentsModeration === null || moderationBusy}
+              onClick={toggleCommentsModeration}
+              className="lab-switch"
+            >
+              <span className="lab-switch-track">
+                <span className="lab-switch-knob" />
+              </span>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -361,6 +440,13 @@ export function AdminDashboard() {
                   {/* 后台同步显示徽标：管理员要能确认「这条真的挂上了」，
                       而不是只在访客视角里才看得见 */}
                   {Boolean(c.admin_badge) && <AdminBadge />}
+                  {/* 待审核标记：提醒管理员这条在前台还看不见，
+                      审核入口在待审核页，这里不重复放「通过」按钮 */}
+                  {c.approved === 0 && (
+                    <span className="rounded-full border border-[var(--gold)]/40 px-2 text-xs leading-5 text-[var(--gold)]">
+                      待审核
+                    </span>
+                  )}
                 </span>
                 <time
                   dateTime={c.created_at}

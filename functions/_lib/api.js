@@ -272,6 +272,43 @@ export async function setCommentsLocked(db, locked) {
     .run();
 }
 
+/** 审核模式的键名。值是 "0" / "1" */
+export const COMMENTS_MODERATION_KEY = "comments_moderation";
+
+/**
+ * 读审核模式开关。
+ *
+ * 与 commentsLocked 同一套失败方向：settings 表不存在、缺行、查询出错，
+ * 一律按「未开启」处理——漏跑迁移最多是审核没生效（评论照常直接可见），
+ * 而不是全站新评论凭空消失、看起来像数据库坏了。
+ */
+export async function commentsModeration(db) {
+  if (!db) return false;
+  try {
+    const row = await db
+      .prepare(`SELECT value FROM settings WHERE key = ?1`)
+      .bind(COMMENTS_MODERATION_KEY)
+      .first();
+    return row ? String(row.value) === "1" : false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 写审核模式开关。同 setCommentsLocked：upsert 不吞异常，
+ * 后台拨开关必须知道有没有真的写进去。
+ */
+export async function setCommentsModeration(db, on) {
+  await db
+    .prepare(
+      `INSERT INTO settings (key, value) VALUES (?1, ?2)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    )
+    .bind(COMMENTS_MODERATION_KEY, on ? "1" : "0")
+    .run();
+}
+
 /* --------------------------------------------------------------- 管理 --- */
 
 /* 管理接口一律走 /api/admin/* 的登录态（签名 Cookie）鉴权。
