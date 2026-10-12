@@ -140,6 +140,12 @@ export function validateComment({ page, name, text }) {
  * 数据库里不该留下访客的真实 IP。加盐（IP_SALT）是防止有人拿常见 IP 段
  * 反查哈希表。
  *
+ * IP 来源的信任前提：优先 CF-Connecting-IP（Cloudflare 注入、客户端伪造
+ * 不进来）；x-forwarded-for 只在非 Cloudflare 环境兜底（本地 wrangler dev、
+ * 自建反代），那种部署下它由最外层代理填写、客户端可伪造——影响的是
+ * 限流粒度（伪造者各自拿到独立的哈希），不影响数据完整性。线上
+ * Cloudflare Pages 部署不受此影响。
+ *
  * IP_SALT 未配置时返回 null，由调用方决定拒绝服务——绝不回退到写死在
  * 公开仓库里的默认盐：那等于没加，所有部署的哈希都能被同一张彩虹表反查。
  */

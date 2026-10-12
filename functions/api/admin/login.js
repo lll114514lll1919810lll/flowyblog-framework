@@ -28,6 +28,13 @@ import {
 const FAIL_DELAY_MS = 400;
 
 export async function onRequestPost({ request, env }) {
+  /*
+    origin 检查说明它防的是什么：本接口没有导出 OPTIONS 处理器（跨源 JSON
+    POST 的预检必失败）、响应也不带 ACAO 头，浏览器的跨源请求根本走不到
+    读响应这一步，src 端又全是同源相对路径调用——所以它实际拦的是
+    「带 Origin 头的非浏览器请求」（curl / 脚本伪装）。保留它作为深度
+    防御，但别指望它挡浏览器。
+  */
   const origin = originAllowed(request, env || {});
   if (origin === null) return json({ error: "来源不允许" }, 403);
 

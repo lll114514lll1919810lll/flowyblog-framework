@@ -189,13 +189,14 @@ function load(): void {
       for (const key of Object.keys(DEFAULT_GLASS_PARAMS[theme]) as (keyof GlassParams)[]) {
         const value = stored[key];
         if (value !== undefined && typeof value === typeof DEFAULT_GLASS_PARAMS[theme][key]) {
-          (current[theme][key] as unknown) = value;
+          Object.assign(current[theme], { [key]: value });
         }
       }
     }
   } catch {
     // 解析失败就用默认值，不打扰用户
   }
+  snapshotCache = null; // current 被就地改过，快照缓存失效
 }
 
 /** 某个主题当前的参数 */
@@ -208,6 +209,7 @@ export function getGlassParams(theme: GlassTheme): GlassParams {
 export function setGlassParams(theme: GlassTheme, patch: Partial<GlassParams>): void {
   load();
   current = { ...current, [theme]: { ...current[theme], ...patch } };
+  snapshotCache = null;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
   } catch {
@@ -237,8 +239,15 @@ export function glassParamsJson(): string {
  *
  * 直接返回对象的话每次调用都是新引用，useSyncExternalStore 会认为「一直在变」
  * 而无限重渲染——use-labs 里也是同一条理由。
+ *
+ * 序列化结果做缓存：React 会在每次渲染相关检查时调快照函数，
+ * 没必要每次都把整个 store 重新 stringify。current 只在 setGlassParams /
+ * load 里变化，两处都会把缓存置空。
  */
+let snapshotCache: string | null = null;
+
 export function glassParamsSnapshot(): string {
   load();
-  return JSON.stringify(current);
+  snapshotCache ??= JSON.stringify(current);
+  return snapshotCache;
 }

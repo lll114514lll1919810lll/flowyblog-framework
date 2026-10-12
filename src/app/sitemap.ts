@@ -69,13 +69,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     })),
 
-    // 标签页：中文标签要编码成 URL 才能被搜索引擎正确解析
-    ...tags.map(({ tag, count }) => ({
-      url: `${base}/tags/${encodeURIComponent(tag)}/`,
-      lastModified: new Date(),
-      changeFrequency: "weekly" as const,
-      // 文章越少的标签页排序权重越低，避免大量薄内容稀释权重
-      priority: count >= 2 ? 0.6 : 0.3,
-    })),
+    // 标签页：中文标签要编码成 URL 才能被搜索引擎正确解析。
+    // lastModified 取该标签下最新文章的日期——用构建时刻的 new Date()
+    // 会让每次部署所有标签页的 lastmod 全部刷新，搜索引擎会误判
+    // 这些页面持续变更（与文章页的谨慎处理保持同一标准）。
+    ...tags.map(({ tag, count }) => {
+      const latest = posts.reduce<string | null>(
+        (acc, p) => (p.tags?.includes(tag) && (acc === null || p.date > acc) ? p.date : acc),
+        null,
+      );
+      return {
+        url: `${base}/tags/${encodeURIComponent(tag)}/`,
+        ...(latest ? { lastModified: new Date(`${latest}T00:00:00Z`) } : {}),
+        changeFrequency: "weekly" as const,
+        // 文章越少的标签页排序权重越低，避免大量薄内容稀释权重
+        priority: count >= 2 ? 0.6 : 0.3,
+      };
+    }),
   ];
 }

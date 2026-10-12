@@ -21,3 +21,9 @@ allowBuilds:
   # 因此 Cloudflare 构建不需要它，关掉即可。
   # 若日后在 CI 里改用 esbuild 打包，再改回 true。
   esbuild: false
+
+  # workerd：wrangler 的本地运行时（wrangler 已是 devDependency）。
+  # 它的安装脚本负责下载平台二进制，`pnpm preview:cf`（wrangler pages dev）
+  # 没有它起不来。纯上传部署（wrangler pages deploy）用不到二进制，
+  # 但 CI 的 install 会因「未声明的安装脚本」直接失败，所以必须显式放行。
+  workerd: true

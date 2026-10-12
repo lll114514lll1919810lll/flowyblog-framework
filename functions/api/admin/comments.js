@@ -22,13 +22,8 @@ import {
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
-/** 统一鉴权：未登录一律 401，前端据此跳回登录页 */
-async function requireSession(request, env) {
-  return hasSession(request, env || {});
-}
-
 export async function onRequestGet({ request, env }) {
-  if (!(await requireSession(request, env))) {
+  if (!(await hasSession(request, env || {}))) {
     return adminJson({ error: "未登录" }, 401);
   }
   if (!env.DB) return adminJson({ error: "缺少 D1 绑定 DB" }, 503);
@@ -97,7 +92,7 @@ export async function onRequestGet({ request, env }) {
  * 都拒，避免 SQLite 把 truthy 值悄悄存成 1 之外的东西。
  */
 export async function onRequestPatch({ request, env }) {
-  if (!(await requireSession(request, env))) {
+  if (!(await hasSession(request, env || {}))) {
     return adminJson({ error: "未登录" }, 401);
   }
   if (!env.DB) return adminJson({ error: "缺少 D1 绑定 DB" }, 503);
@@ -132,7 +127,7 @@ export async function onRequestPatch({ request, env }) {
 }
 
 export async function onRequestDelete({ request, env }) {
-  if (!(await requireSession(request, env))) {
+  if (!(await hasSession(request, env || {}))) {
     return adminJson({ error: "未登录" }, 401);
   }
   if (!env.DB) return adminJson({ error: "缺少 D1 绑定 DB" }, 503);

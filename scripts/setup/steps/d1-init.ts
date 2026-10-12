@@ -11,7 +11,12 @@
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { humanizeCloudflareError, repoSlugFromUrl, slugifyId } from "../context";
+import {
+  assertShellSafeName,
+  humanizeCloudflareError,
+  repoSlugFromUrl,
+  slugifyId,
+} from "../context";
 import type { SetupContext, SetupStep } from "../types";
 
 const TOML_FILE = "wrangler.toml";
@@ -47,7 +52,10 @@ function writeTomlValue(
   if (!re.test(text)) {
     throw new Error(`wrangler.toml 里找不到 ${field} 字段，请手动填写后重跑本步骤`);
   }
-  const updated = text.replace(re, `$1${value}$2`);
+  // 用替换函数而不是 "$1<value>$2"：值里若含 $ 字符（如 UUID 之外的
+  // 自定义串），字符串形式的 replacement 会把 $1、$& 之类的序列当成
+  // 捕获组引用，导致新旧值拼接。函数形式原样插入，无需转义。
+  const updated = text.replace(re, (_match, head: string, tail: string) => `${head}${value}${tail}`);
   writeFileSync(join(ctx.root, TOML_FILE), updated, "utf8");
   ctx.logger.log(`${field} 已写入 wrangler.toml`);
   return updated;
@@ -83,6 +91,8 @@ export const d1Init: SetupStep = {
     let text = readToml(ctx);
     let name = readDbConfig(text).name;
     let id = readDbConfig(text).id;
+    // 名字会被原样拼进 shell 命令（可能来自用户手改的 toml），先过白名单
+    assertShellSafeName(name, "D1 数据库名");
 
     if (!id || id === PLACEHOLDER_ID) {
       // 占位名 → 按站点派生并回填；用户自定义过的名字不动。

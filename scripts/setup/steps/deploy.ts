@@ -10,7 +10,11 @@
  */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { humanizeCloudflareError, projectName } from "../context";
+import {
+  assertShellSafeName,
+  humanizeCloudflareError,
+  projectName,
+} from "../context";
 import type { SetupContext, SetupStep } from "../types";
 
 /** 依赖装没装的判据：next 包在 node_modules 里（pnpm 也会为直接依赖建实体目录）。 */
@@ -34,6 +38,8 @@ export const deploy: SetupStep = {
 
   async run(ctx) {
     const name = projectName(ctx.root);
+    // 项目名会被原样拼进 shell 命令（可能来自用户手改的 toml），先过白名单
+    assertShellSafeName(name, "Pages 项目名");
 
     // 无 git 仓库（如直接下载源码包）也能部署，但要让用户明白代价：
     // AGPL 的源码提供义务 + 无法升级/换机器，都从这里开始

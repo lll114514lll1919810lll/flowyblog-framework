@@ -105,9 +105,11 @@ export function AdminDashboard() {
           return;
         }
 
-        const payload = body as Payload;
+        // 运行时收窄而不是盲信断言：后端形状意外时显示空列表/0，
+        // 也好过把 undefined 直接渲染出去
+        const payload = body as Partial<Payload> | null;
         setItems(Array.isArray(payload?.items) ? payload.items : []);
-        setTotal(payload?.total ?? 0);
+        setTotal(typeof payload?.total === "number" ? payload.total : 0);
         setError("");
         setLoading(false);
       } catch {

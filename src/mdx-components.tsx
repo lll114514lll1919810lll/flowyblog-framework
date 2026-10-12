@@ -1,5 +1,5 @@
 import type { MDXComponents } from "mdx/types";
-import { CodeBlock } from "@/components/code-block";
+import { CodeBlock, type PreElementProps } from "@/components/code-block";
 
 /**
  * 全局 MDX 组件映射。
@@ -13,21 +13,18 @@ const components: MDXComponents = {
    * 接管所有 <pre>，给它加上复制按钮、语言标签和横向滚动提示。
    *
    * rehype-pretty-code 会把语言名写在 pre 的 data-language 属性上，
-   * 这里把它取出来传给 CodeBlock 用于显示标签。
+   * 按类型拆出来传给 CodeBlock。MDX 的 pre 类型不认识 data-* 属性，
+   * 所以边界上需要一次显式断言（PreElementProps 是两端共用的形状定义，
+   * 见 code-block.tsx）——除此之外整条链路都是类型对齐的。
    */
-  pre: ({ className, children, ...props }) => (
-    <CodeBlock
-      {...(props as React.HTMLAttributes<HTMLPreElement>)}
-      className={className}
-      language={
-        (props as Record<string, unknown>)["data-language"] as
-          | string
-          | undefined
-      }
-    >
-      {children}
-    </CodeBlock>
-  ),
+  pre: ({ className, children, ...props }) => {
+    const { "data-language": language, ...rest } = props as PreElementProps;
+    return (
+      <CodeBlock {...rest} className={className} language={language}>
+        {children}
+      </CodeBlock>
+    );
+  },
 
   /**
    * 表格外面套一层横向滚动容器。

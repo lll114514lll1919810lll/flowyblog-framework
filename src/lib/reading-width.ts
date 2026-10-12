@@ -104,6 +104,11 @@ export function useReadingWidth() {
  * 开始观测时浏览器会立刻回调一次，首次测量由它完成，也就不必额外触发
  * 一轮渲染（react-hooks/set-state-in-effect 也不答应）。
  */
+
+/** 测量用的 canvas 上下文，模块级复用——ResizeObserver 回调在拖动窗口时会
+    高频触发，每次都 createElement + getContext 纯属浪费 */
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+
 export function useCharsPerLine(ref: RefObject<HTMLElement | null>) {
   const [chars, setChars] = useState<number>();
 
@@ -112,7 +117,9 @@ export function useCharsPerLine(ref: RefObject<HTMLElement | null>) {
     if (!el) return;
 
     const measure = () => {
-      const ctx = document.createElement("canvas").getContext("2d");
+      // undefined = 还没建过；null = 建过但环境不支持，直接放弃
+      measureCtx ??= document.createElement("canvas").getContext("2d");
+      const ctx = measureCtx;
       if (!ctx) return;
 
       const style = getComputedStyle(el);

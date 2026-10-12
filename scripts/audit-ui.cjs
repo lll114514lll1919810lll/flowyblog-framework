@@ -10,6 +10,7 @@
  */
 
 const fs = require('fs');
+const path = require('path');
 const WebSocket = require('ws');
 
 const PORT = process.argv[2] || 9333;
@@ -328,7 +329,7 @@ async function auditAnimations(send) {
      会得到一连串假失败。这里先量 300ms 内有多少帧，
      低于阈值就让报告把这节标成「数据不可信」，而不是当成代码问题。
    */
-  await goto(send, `${BASE}/blog/10-hello-world`, 1280, 900);
+  await goto(send, `${BASE}/blog/1-hello-world`, 1280, 900);
   out.frameTicks = await evaluate(
     send,
     `
@@ -481,7 +482,7 @@ async function auditAnimations(send) {
   };
 
   // 5. 移动端折叠目录：点击后是否展开
-  await goto(send, `${BASE}/blog/10-hello-world`, 390, 844);
+  await goto(send, `${BASE}/blog/1-hello-world`, 390, 844);
 
   /*
      不能用「可见链接数量」判断展开：面板收起靠的是 grid-template-rows: 0fr
@@ -538,7 +539,7 @@ async function auditAnimations(send) {
 const PAGES = [
   { name: '首页', path: '/' },
   { name: '文章列表', path: '/blog' },
-  { name: '文章详情', path: '/blog/10-hello-world' },
+  { name: '文章详情', path: '/blog/1-hello-world' },
   { name: '短文章', path: '/blog/2-same-day-order-earlier' },
   { name: '标签', path: '/tags' },
   { name: '关于', path: '/about' },
@@ -582,6 +583,7 @@ async function main() {
   report['__consoleErrors__'] = consoleErrors;
 
   const outPath = process.argv[4] || '.preview/audit-raw.json';
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify(report, null, 2), 'utf8');
   console.log(`报告已写入 ${outPath}`);
   ws.close();

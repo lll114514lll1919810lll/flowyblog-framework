@@ -69,6 +69,22 @@ export function dirtyOverlayFiles(ctx: SetupContext): string[] {
   return out ? out.split(/\r?\n/) : [];
 }
 
+/**
+ * 校验将要拼进 shell 命令的资源名（D1 库名 / Pages 项目名）。
+ *
+ * 这些名字可能来自用户手改的 wrangler.toml，向导用正则原样提取后、
+ * 不做转义地拼进 shell: true 的命令行（npx wrangler d1 create <name> 等），
+ * 字符白名单是最直接的防线。不合法直接抛错，让用户改 toml。
+ */
+export function assertShellSafeName(name: string, what: string): void {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$/.test(name)) {
+    throw new Error(
+      `${what}「${name}」包含不支持的字符（只允许字母、数字、点、连字符、下划线，` +
+        "以字母或数字开头，≤63 位）。请修改 wrangler.toml 后重跑本步骤。",
+    );
+  }
+}
+
 /** 终端着色。非 TTY（管道 / CI / --json）时原样返回，避免转义串污染日志。 */
 export const c = {
   green: (s: string) => (process.stdout.isTTY ? `\x1b[32m${s}\x1b[0m` : s),

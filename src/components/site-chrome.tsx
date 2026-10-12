@@ -84,6 +84,9 @@ export function SiteFooter() {
         style={{ maxWidth: CONTENT_MAX_WIDTH }}
       >
         <div className="flex flex-col gap-1">
+          {/* 静态导出下这是构建期求值：年份固化为最近一次部署的那年。
+              跨年不重新部署就会显示旧年份——重新发布（push 即重建）即可更新，
+              不值得为它引入一段客户端脚本。 */}
           <p>
             © {new Date().getFullYear()} {siteConfig.author}
           </p>

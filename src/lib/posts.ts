@@ -38,6 +38,24 @@ function isPostFile(fileName: string): boolean {
   return fileName.endsWith(".mdx") && !fileName.startsWith("_");
 }
 
+/**
+ * slug 拒绝路径分隔符与 `..` 穿越后再拼文件路径：
+ * getPostBySlug / getTableOfContents 会拿它直接拼文件路径，
+ * 开发服务器里构造的 slug 不该有能力读出 content 目录之外的东西。
+ * 除分隔符和点前缀外不做字符限制——文章文件名允许中文（见 README），
+ * 文件名天然满足这些约束（readdir 的产物），所以正常调用零开销。
+ */
+function isSafeSlug(slug: string): boolean {
+  return (
+    slug.length > 0 &&
+    slug.length <= 200 &&
+    !slug.includes("/") &&
+    !slug.includes("\\") &&
+    !slug.includes("..") &&
+    !slug.startsWith(".")
+  );
+}
+
 /** 取出目录下所有文章的元信息，按日期倒序（最新在前）。 */
 export function getAllPosts(): Post[] {
   if (postsCache) return postsCache;
@@ -68,6 +86,7 @@ export function getAllPosts(): Post[] {
 
 /** 根据 slug 取单篇文章的元信息；找不到返回 null。 */
 export function getPostBySlug(slug: string): Post | null {
+  if (!isSafeSlug(slug)) return null;
   const filePath = path.join(POSTS_DIR, `${slug}.mdx`);
   if (!fs.existsSync(filePath)) return null;
 
@@ -123,6 +142,7 @@ export function stripMath(text: string): string {
  * 标题清洗与公式块跳过规则和 search-index.ts 的锚点提取保持同一份（见 stripMath）。
  */
 export function getTableOfContents(slug: string): TocItem[] {
+  if (!isSafeSlug(slug)) return [];
   const filePath = path.join(POSTS_DIR, `${slug}.mdx`);
   if (!fs.existsSync(filePath)) return [];
 
@@ -343,15 +363,21 @@ function parseMetadata(source: string): PostMetadata {
   // 的 .replace(/'/g, '"') 会把双引号值里的撇号替换坏，解析失败后整篇
   // 文章静默落到「未命名文章 / 1970-01-01」。
   try {
-    const value = new Function(`return (${block})`)() as PostMetadata;
+    // 逐字段校验类型后再采信：metadata 是作者手写的，字段写错形状
+    // （title 写成对象之类）不该把脏数据带进列表 / 搜索 / sitemap
+    const value = new Function(`return (${block})`)() as Record<string, unknown>;
+    const str = (v: unknown): string | undefined =>
+      typeof v === "string" && v.length > 0 ? v : undefined;
     return {
-      title: value.title ?? "未命名文章",
-      date: value.date ?? "1970-01-01",
-      publishedAt: value.publishedAt,
-      description: value.description,
-      cover: value.cover ? withAssetVersion(value.cover) : undefined,
-      tags: value.tags,
-      draft: value.draft,
+      title: str(value.title) ?? "未命名文章",
+      date: str(value.date) ?? "1970-01-01",
+      publishedAt: str(value.publishedAt),
+      description: str(value.description),
+      cover: str(value.cover) ? withAssetVersion(str(value.cover)!) : undefined,
+      tags: Array.isArray(value.tags)
+        ? value.tags.filter((t): t is string => typeof t === "string")
+        : undefined,
+      draft: typeof value.draft === "boolean" ? value.draft : undefined,
     };
   } catch {
     return { title: "未命名文章", date: "1970-01-01" };

@@ -18,8 +18,17 @@ import {
  * 这个组件只负责交互，因此整个代码块不需要客户端重渲染正文——
  * 代码文本是服务端渲染好的 HTML。
  */
-/** pre 上会多带一个 data-language（由 rehype-pretty-code 注入） */
-type CodeBlockProps = React.HTMLAttributes<HTMLElement> & {
+/**
+ * MDX 的 pre 映射传进来的 props：rehype 产物的 HTML 属性，
+ * 其中 data-language 由 rehype-pretty-code 注入（语言名）。
+ * 导出给 mdx-components 复用——props 形状只在这一处定义，
+ * 两端由编译器对齐，不再靠散落的 as 断言串联。
+ */
+export type PreElementProps = React.HTMLAttributes<HTMLPreElement> & {
+  "data-language"?: string;
+};
+
+type CodeBlockProps = PreElementProps & {
   /** 语言名，来自 pre 的 data-language，用于显示标签 */
   language?: string;
 };
@@ -70,17 +79,14 @@ export function CodeBlock({
   children,
   className,
   language,
-  ...props
+  "data-language": _discard,
+  style: incomingStyle,
+  ...rest
 }: CodeBlockProps) {
   // data-language 已经转成 language 单独用了，从透传里剔除，
   // 避免同一个属性既写到外层容器又写到 pre 上。
   // style 也要单独拿出来：rehype-pretty-code 会往 pre 上写 Shiki 的
   // CSS 变量，直接 {...rest} 展开会把下面那条 maxHeight 整个盖掉。
-  const {
-    ["data-language"]: _discard,
-    style: incomingStyle,
-    ...rest
-  } = props as Record<string, unknown>;
   void _discard;
   const preRef = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
@@ -211,7 +217,7 @@ export function CodeBlock({
           而且 maxHeight 必须排在它后面才不会被盖掉。
         */
         style={{
-          ...(incomingStyle as React.CSSProperties | undefined),
+          ...incomingStyle,
           ...(foldable && fullHeight && !collapsed
             ? { maxHeight: fullHeight + 2 }
             : undefined),

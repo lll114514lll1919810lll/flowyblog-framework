@@ -174,6 +174,18 @@ function readBody(req: IncomingMessage): Promise<string> {
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   try {
+    // Host 白名单：服务虽然只绑定回环地址，但 DNS rebinding 可以让恶意网页
+    // 把自己控制的域名解析到 127.0.0.1，从而以「同源」身份读 /api/state
+    // （含全部答案）或触发 /api/run。校验 Host 头堵掉这条路。
+    const rawHost = (req.headers.host ?? "").toLowerCase();
+    const host = rawHost.startsWith("[")
+      ? rawHost.slice(0, rawHost.indexOf("]") + 1)
+      : rawHost.split(":")[0];
+    if (host !== "127.0.0.1" && host !== "localhost" && host !== "[::1]") {
+      res.writeHead(403);
+      res.end("forbidden host");
+      return;
+    }
     if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(PAGE);
