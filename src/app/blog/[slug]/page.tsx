@@ -64,6 +64,14 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
   return (
     <PostBody
       toc={toc}
+      prevNext={{
+        previous: allPosts[index + 1]
+          ? { slug: allPosts[index + 1].slug, title: allPosts[index + 1].title }
+          : undefined,
+        next: allPosts[index - 1]
+          ? { slug: allPosts[index - 1].slug, title: allPosts[index - 1].title }
+          : undefined,
+      }}
       header={
         <header className="article-header flex flex-col gap-5 pb-7">
           {/*

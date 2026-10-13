@@ -12,6 +12,7 @@ import {
 import { FONT_SIZES, useFontSize } from "@/lib/reading-font-size";
 import type { FontSizeId } from "@/lib/reading-font-size";
 import type { TocItem } from "@/lib/posts";
+import type { PostRef } from "@/components/post-navigation";
 
 /**
  * 文章主体区域。
@@ -27,6 +28,7 @@ export function PostBody({
   toc,
   header,
   footer,
+  prevNext,
   children,
 }: {
   toc: TocItem[];
@@ -34,6 +36,8 @@ export function PostBody({
   header: ReactNode;
   /** 文章末尾（上一篇/下一篇），由 server 组件渲染 */
   footer: ReactNode;
+  /** 上下篇的 slug/标题，渲染在桌面侧栏目录下方（不传则不渲染） */
+  prevNext?: { previous?: PostRef; next?: PostRef };
   children: ReactNode;
 }) {
   const { widthId, setWidth } = useReadingWidth();
@@ -63,7 +67,7 @@ export function PostBody({
     >
       {/* 放不下侧栏时收成悬浮球：页面右上角小圆按钮，点开弹出目录面板 */}
       <div className="toc-top-slot">
-        <TableOfContents variant="collapsible" items={toc} />
+        <TableOfContents variant="collapsible" items={toc} prevNext={prevNext} />
       </div>
 
       {/* 放得下时正文 + 目录并排，整块居中。
@@ -124,7 +128,7 @@ export function PostBody({
           拉伸到整行高度后，sticky 才有足够的行程。
         */}
         <div className="toc-sidebar-slot">
-          <TableOfContents variant="sidebar" items={toc} />
+          <TableOfContents variant="sidebar" items={toc} prevNext={prevNext} />
         </div>
       </div>
 

@@ -82,6 +82,20 @@ type CheapFilter = {
 /** 会被当作玻璃候选的面板。三处（量元素、逐帧预检、嵌套判断）共用一份 */
 const PANEL_SELECTOR = ".panel, .panel-strong, .panel-raised";
 
+/**
+ * 候选里的例外：命中这些选择器的面板保持原本的亚克力外观，不上玻璃。
+ *
+ * - .toc-fab-panel：目录悬浮球弹出的面板。它常年在 DOM 里、靠
+ *   visibility + transform 切换显隐和做缩放淡入——玻璃矩形的量取
+ *   跟不上这套动画，弹出瞬间会露出一块错位的空壳；收起后画布上还留着
+ *   一块看不见的面板的玻璃。
+ * - .toc-fab 与回到顶部按钮：两枚悬浮的圆钮浮在文章玻璃面板的边缘上，
+ *   它们自己的玻璃画在 canvas 里，会被文章玻璃的折射一起扭掉——
+ *   排除后回到普通 DOM 层，永远渲染在文章面板上方。
+ */
+const PANEL_EXCLUDE_SELECTOR =
+  '.toc-fab-panel, .toc-fab, button[aria-label="回到顶部"]';
+
 /** 面板上的标记：CSS 靠它把面板底转透明 */
 const PANEL_ATTR = "data-lab-glass-panel";
 
@@ -541,7 +555,7 @@ export function LiquidGlassPanels() {
         ...document.querySelectorAll<HTMLElement>(
           PANEL_SELECTOR,
         ),
-      ];
+      ].filter((panel) => !panel.matches(PANEL_EXCLUDE_SELECTOR));
 
       const elements: GlassElementConfig[] = [];
       const nextPanels: HTMLElement[] = [];
@@ -694,6 +708,8 @@ export function LiquidGlassPanels() {
       const parts: string[] = [];
       const dims: number[] = [];
       for (const panel of document.querySelectorAll<HTMLElement>(PANEL_SELECTOR)) {
+        // 排除名单里的面板不参与签名：它们不上玻璃，量了也是白量
+        if (panel.matches(PANEL_EXCLUDE_SELECTOR)) continue;
         const r = panel.getBoundingClientRect();
         /*
           跟随文档流的面板用**文档坐标**，别用视口坐标。

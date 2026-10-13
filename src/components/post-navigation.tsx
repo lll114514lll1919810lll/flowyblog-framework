@@ -2,6 +2,12 @@ import Link from "next/link";
 import type { Post } from "@/lib/posts";
 
 /**
+ * 上下篇条目的最小数据。侧栏快捷导航只需要这两样，
+ * 传整个 Post 会把封面、标签等一并序列化进客户端负载，没必要。
+ */
+export type PostRef = { slug: string; title: string };
+
+/**
  * 文章末尾的「上一篇 / 下一篇」。
  *
  * getAllPosts 已按日期倒序排列，所以当前文章的下标 +1 是更旧的（上一篇），

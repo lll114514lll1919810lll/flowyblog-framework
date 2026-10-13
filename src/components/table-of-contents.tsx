@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import type { TocItem } from "@/lib/posts";
+import type { PostRef } from "@/components/post-navigation";
 import { useFontSize } from "@/lib/reading-font-size";
 import {
   getScrollLock,
@@ -28,24 +30,65 @@ const COLLAPSE_DELAY_MS = TOC_TOGGLE_MS + 40;
 /**
  * 文章目录的两种形态：
  * - sidebar：桌面端，贴在正文右侧，滚动时高亮当前小节
- * - collapsible：移动端，收进一个可折叠按钮里，侧栏在窄屏没有空间
+ * - collapsible：移动端，收进页面右上角的悬浮球，点开弹出面板
  *
  * 由调用方用断点决定渲染哪一种，各自只挂载一次观察器。
+ * prevNext 可选：渲染在目录列表下方的上一篇/下一篇快捷跳转。
  */
 export function TableOfContents({
   items,
   variant,
+  prevNext,
 }: {
   items: TocItem[];
   variant: "sidebar" | "collapsible";
+  prevNext?: { previous?: PostRef; next?: PostRef };
 }) {
   // 少于两节的目录没有导航价值，直接不渲染
   if (items.length < 2) return null;
 
   return variant === "sidebar" ? (
-    <Sidebar items={items} />
+    <Sidebar items={items} prevNext={prevNext} />
   ) : (
-    <Collapsible items={items} />
+    <Collapsible items={items} prevNext={prevNext} />
+  );
+}
+
+/**
+ * 目录列表下方的上一篇/下一篇快捷跳转，桌面侧栏与移动悬浮球共用。
+ *
+ * 放在面板内部而不是面板外的兄弟块：目录面板是 sticky 的，外面的
+ * 兄弟块会随页面滚上来叠在面板上（实际出现过的遮挡 bug）；
+ * 在面板内部则永远跟着面板走。移动端也因此有了入口。
+ */
+function TocNavFooter({
+  previous,
+  next,
+}: {
+  previous?: PostRef;
+  next?: PostRef;
+}) {
+  if (!previous && !next) return null;
+
+  const item = (ref: PostRef, label: string) => (
+    <Link
+      href={`/blog/${ref.slug}`}
+      className="group flex flex-col rounded px-1 py-0.5 transition-colors hover:bg-surface"
+    >
+      <span className="text-[11px] text-muted">{label}</span>
+      <span className="line-clamp-1 text-[13px] font-medium leading-snug transition-colors group-hover:text-accent">
+        {ref.title}
+      </span>
+    </Link>
+  );
+
+  return (
+    /* 水平内边距对齐面板头部行（px-4）；pb 别省——面板容器没有内边距，
+       列表的 p-3 只包住自己，页脚不补就会贴着面板底缘 */
+    <div className="mt-3 flex shrink-0 flex-col gap-2.5 border-t border-border px-3 pb-2.5 pt-2.5">
+      {previous && item(previous, "← 上一篇")}
+      {next && item(next, "下一篇 →")}
+    </div>
   );
 }
 
@@ -157,7 +200,13 @@ function useTocGroups(tree: TocNode[], activeId: string) {
  * 长文章常有几十个三级标题，全部铺开会把侧栏撑得很长、挤占正文视野，
  * 所以默认只显示二级标题，点某个二级标题才展开它的子项。
  */
-function Sidebar({ items }: { items: TocItem[] }) {
+function Sidebar({
+  items,
+  prevNext,
+}: {
+  items: TocItem[];
+  prevNext?: { previous?: PostRef; next?: PostRef };
+}) {
   const activeId = useActiveHeading(items);
   const tree = useMemo(() => buildTree(items), [items]);
   const { activeGroupId, manualId, closingId, toggle } = useTocGroups(tree, activeId);
@@ -466,6 +515,8 @@ function Sidebar({ items }: { items: TocItem[] }) {
           );
         })}
       </ul>
+
+      {prevNext && <TocNavFooter {...prevNext} />}
     </nav>
   );
 }
@@ -479,7 +530,13 @@ function Sidebar({ items }: { items: TocItem[] }) {
  *
  * 只在展开后才启用滚动高亮，收起时不浪费观察器。
  */
-function Collapsible({ items }: { items: TocItem[] }) {
+function Collapsible({
+  items,
+  prevNext,
+}: {
+  items: TocItem[];
+  prevNext?: { previous?: PostRef; next?: PostRef };
+}) {
   const [open, setOpen] = useState(false);
   // 点面板外收起需要判定点击目标是否在球/面板内
   const rootRef = useRef<HTMLDivElement>(null);
@@ -694,6 +751,8 @@ function Collapsible({ items }: { items: TocItem[] }) {
             );
           })}
         </ul>
+
+        {prevNext && <TocNavFooter {...prevNext} />}
       </div>
     </div>
   );

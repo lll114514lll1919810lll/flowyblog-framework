@@ -550,7 +550,11 @@
     top: calc(100% + 0.625rem);
     right: 0;
     width: min(20rem, calc(100vw - 2rem));
-    max-height: calc(100vh - var(--header-h) - 4.5rem);
+    /* 手机浏览器的 100vh 含地址栏高度，可视区比它矮——用 vh 算的面板底
+       会被顶出屏幕（页脚「下一篇」被截）。dvh 是动态可视高度，逐行覆盖：
+       老浏览器不认 dvh 时落回上一行的 vh，行为跟以前一样。 */
+    max-height: calc(100vh - var(--header-h) - 5.5rem);
+    max-height: calc(100dvh - var(--header-h) - 5.5rem);
     display: flex;
     flex-direction: column;
     overflow: hidden;
