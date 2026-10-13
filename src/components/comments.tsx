@@ -48,6 +48,15 @@ type Status = "loading" | "ready" | "unavailable" | "error";
 const MAX_TEXT = 500;
 const MAX_NAME = 24;
 
+/** 顶层留言每页条数。回复不占页数——它们跟着自己的根留言走 */
+const COMMENTS_PER_PAGE = 10;
+/** 超过这个字数（或换行数）的留言默认折叠，点「展开全文」看全部 */
+const COLLAPSE_CHARS = 150;
+const COLLAPSE_LINES = 6;
+/** 回复楼的折叠：超过这个条数的楼层默认收起，只露出最早的几条 */
+const REPLIES_COLLAPSE_AT = 3;
+const REPLIES_PREVIEW = 2;
+
 export function Comments({ page }: { page: string }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [status, setStatus] = useState<Status>("loading");
@@ -89,6 +98,27 @@ export function Comments({ page }: { page: string }) {
   const [pinBusy, setPinBusy] = useState<number | null>(null);
 
   const [reloadKey, setReloadKey] = useState(0);
+
+  /** 顶层留言当前页（从 1 起）。只对普通时间流分页，AI/置顶池每页常驻 */
+  const [commentPage, setCommentPage] = useState(1);
+  /** 默认折叠、被读者手动展开过的留言 id（长留言正文） */
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  /** 默认收起、被读者手动展开过的回复楼（根留言 id） */
+  const [threadOpenIds, setThreadOpenIds] = useState<Set<number>>(new Set());
+
+  /*
+   * 换了文章就重置分页和折叠状态：Next 复用同一组件实例渲染不同文章，
+   * 不重置的话上一篇翻到第 3 页，下一篇会直接从第 3 页开始。
+   * 用渲染期比较（与 table-of-contents 的 useTocGroups 同一写法），
+   * 不用 effect：effect 里同步 setState 会多渲染一轮。
+   */
+  const [prevPage, setPrevPage] = useState(page);
+  if (page !== prevPage) {
+    setPrevPage(page);
+    setCommentPage(1);
+    setExpandedIds(new Set());
+    setThreadOpenIds(new Set());
+  }
 
   const textRef = useRef<HTMLTextAreaElement>(null);
   const replyRef = useRef<HTMLTextAreaElement>(null);
@@ -192,7 +222,43 @@ export function Comments({ page }: { page: string }) {
   // 顶层是新在前（后端 id 倒序），但一层对话按时间正序读才自然
   for (const arr of replyMap.values()) arr.reverse();
 
+  /* ---------------------------------------------------------- 分页 --- */
+
+  /*
+   * 只给普通时间流分页：AI 总结和置顶是「钉在评论区开头」的少数几条，
+   * 每页常驻才符合置顶的语义；回复跟着根留言走，不占页数。
+   * 数据仍是一次全量拉取（留言量级对个人博客足够），分页只是渲染层的事，
+   * 不动接口。
+   */
+  const totalPages = Math.max(1, Math.ceil(normalRoots.length / COMMENTS_PER_PAGE));
+  // 留言被删后当前页可能越界（比如停在第 3 页只剩 2 页），夹回范围内
+  const safePage = Math.min(commentPage, totalPages);
+  const pageRoots = normalRoots.slice(
+    (safePage - 1) * COMMENTS_PER_PAGE,
+    safePage * COMMENTS_PER_PAGE,
+  );
+
   /* ------------------------------------------------------------ 动作 --- */
+
+  /** 展开/收起一条被折叠的长留言 */
+  function toggleExpanded(id: number) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  /** 展开/收起一个回复楼 */
+  function toggleThread(id: number) {
+    setThreadOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   /**
    * 发表（顶层或回复共用）。
@@ -246,6 +312,8 @@ export function Comments({ page }: { page: string }) {
       setNotice(
         result.pending ? "已提交，等待博主审核后才会显示" : "留言成功",
       );
+      // 新留言排在普通流最前（第 1 页），跳回去让作者立刻看到自己发的
+      setCommentPage(1);
       setReloadKey((k) => k + 1);
     } catch {
       setNotice("提交失败，请检查网络后重试");
@@ -283,6 +351,12 @@ export function Comments({ page }: { page: string }) {
       setNotice(
         result.pending ? "已提交，等待博主审核后才会显示" : "回复成功",
       );
+      // 楼层超过折叠阈值时新回复排在最后、默认看不见，
+      // 展开这层楼让回复者立刻看到自己发的（pending 时楼层收着也无妨，展开无害）
+      if (replyTo !== null) {
+        const target = replyTo;
+        setThreadOpenIds((prev) => new Set(prev).add(target));
+      }
       setReloadKey((k) => k + 1);
     } catch {
       setNotice("提交失败，请检查网络后重试");
@@ -611,6 +685,17 @@ export function Comments({ page }: { page: string }) {
     const replies = replyMap.get(c.id) ?? [];
     const replyCount = replies.length;
 
+    /*
+     * 长留言默认折叠：字数超阈值，或换行多到肉眼已经是一大块（几十个
+     * 字换一行也够长）。折叠用 line-clamp 截断而不是按字数切片——
+     * 切片会丢掉 mid-text 的换行和排版，clamp 保留原样只裁显示高度。
+     */
+    const isLong =
+      c.text.length > COLLAPSE_CHARS ||
+      c.text.split("\n").length > COLLAPSE_LINES;
+    const expanded = expandedIds.has(c.id);
+    const threadOpen = threadOpenIds.has(c.id);
+
     return (
       <div key={c.id}>
         <article
@@ -626,20 +711,56 @@ export function Comments({ page }: { page: string }) {
           {/* whitespace-pre-wrap 保留用户输入的换行；
               break-words 防止超长无空格串（URL）撑破面板。
               字号继承 .comment-item，随文章字号档位缩放 */}
-          <p className="mt-2 whitespace-pre-wrap break-words leading-relaxed text-secondary">
+          <p
+            className={`mt-2 whitespace-pre-wrap break-words leading-relaxed text-secondary ${
+              isLong && !expanded ? "line-clamp-5" : ""
+            }`}
+          >
             {c.text}
           </p>
+          {isLong && (
+            <button
+              type="button"
+              onClick={() => toggleExpanded(c.id)}
+              aria-expanded={expanded}
+              className="mt-1.5 text-xs text-muted transition-colors hover:text-accent"
+            >
+              {expanded ? "收起" : "展开全文"}
+            </button>
+          )}
           {renderDeleteConfirm(c, replyCount)}
         </article>
 
         {renderReplyForm(c)}
 
         {!isReply && replyCount > 0 && (
-          <ul className="mt-3 flex flex-col gap-3 border-l border-border pl-4">
-            {replies.map((r) => (
-              <li key={r.id}>{renderComment(r, true)}</li>
-            ))}
-          </ul>
+          <>
+            {/*
+              回复楼折叠：超过阈值的楼层默认只露最早的几条，剩下的收进
+              「展开 N 条回复」。截前缀而不是后缀——对话按时间正序读，
+              开头才是上下文；新回复在末尾，展开动作也自然落在列表末尾。
+            */}
+            <ul className="mt-3 flex flex-col gap-3 border-l border-border pl-4">
+              {(replyCount > REPLIES_COLLAPSE_AT && !threadOpen
+                ? replies.slice(0, REPLIES_PREVIEW)
+                : replies
+              ).map((r) => (
+                <li key={r.id}>{renderComment(r, true)}</li>
+              ))}
+            </ul>
+            {replyCount > REPLIES_COLLAPSE_AT && (
+              <button
+                type="button"
+                onClick={() => toggleThread(c.id)}
+                aria-expanded={threadOpen}
+                className="mt-2 text-xs text-muted transition-colors hover:text-accent"
+              >
+                {threadOpen
+                  ? "收起回复"
+                  : `展开 ${replyCount - REPLIES_PREVIEW} 条回复`}
+              </button>
+            )}
+          </>
         )}
       </div>
     );
@@ -813,10 +934,38 @@ export function Comments({ page }: { page: string }) {
             aiRoots.length > 0 || pinnedRoots.length > 0 ? "mt-4" : "mt-6"
           }`}
         >
-          {normalRoots.map((c) => (
+          {pageRoots.map((c) => (
             <li key={c.id}>{renderComment(c, false)}</li>
           ))}
         </ul>
+      )}
+
+      {/* 顶层留言分页。只有一页时不渲染；翻页是纯前端状态切换，就地换列表 */}
+      {status === "ready" && totalPages > 1 && (
+        <nav
+          aria-label="留言分页"
+          className="mt-6 flex items-center justify-center gap-4"
+        >
+          <button
+            type="button"
+            disabled={safePage <= 1}
+            onClick={() => setCommentPage((p) => Math.max(1, p - 1))}
+            className="btn-pill disabled:opacity-40"
+          >
+            上一页
+          </button>
+          <span className="text-xs tabular-nums text-muted">
+            第 {safePage} / {totalPages} 页 · 普通留言 {normalRoots.length} 条
+          </span>
+          <button
+            type="button"
+            disabled={safePage >= totalPages}
+            onClick={() => setCommentPage((p) => Math.min(totalPages, p + 1))}
+            className="btn-pill disabled:opacity-40"
+          >
+            下一页
+          </button>
+        </nav>
       )}
     </section>
   );
