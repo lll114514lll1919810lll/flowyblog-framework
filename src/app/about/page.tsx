@@ -192,6 +192,40 @@ export default function AboutPage() {
           </ul>
         </aside>
       </div>
+
+      {/*
+        更新日志：站点功能与内容的更新记录，手动维护。
+        加条目时照下面的格式写（最新的放最上面）：
+          <li>
+            <strong>YYYY-MM-DD</strong>：做了什么。
+          </li>
+      */}
+      <section className="panel panel-strong prose max-w-3xl px-6 py-7 sm:px-10 sm:py-9">
+        <h2>更新日志</h2>
+        <p>这个站点的功能与内容更新会记录在这里。</p>
+        <ul>
+          <li>
+            <strong>2026-10-13</strong>：发布 v1.0.0，首个正式版本。新增外观设置页，
+            实底、书本、圆角从实验室转正；移动端阅读体验优化：目录收进悬浮球、
+            表格圆角化、卡片加宽、评论区分页与长留言折叠；目录面板支持
+            上一篇/下一篇快捷跳转；新增「静止」开关，一键关闭所有动画；
+            管理员可在后台直接修改留言内容。
+          </li>
+          <li>
+            <strong>2026-10-12</strong>：评论区支持置顶与 AI 文章总结，
+            新增 AI 评论审核接口；文章字号三档调节、 favicon 可配置；
+            搜索与 UI 细节打磨，修复一批安全与体验问题。
+          </li>
+          <li>
+            <strong>2026-10-11</strong>：一键部署向导上线（命令行 + 网页引导两种形态），
+            评论支持审核模式，D1 数据库与 Pages 项目改按站点自动命名。
+          </li>
+          <li>
+            <strong>2026-10-08</strong>：项目启动。Next.js 16 + MDX 的静态博客框架，
+            评论基于 Cloudflare Pages Functions + D1，液态玻璃外观同期落地。
+          </li>
+        </ul>
+      </section>
     </div>
   );
 }
