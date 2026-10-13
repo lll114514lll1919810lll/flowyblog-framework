@@ -18,7 +18,7 @@ import {
 } from "@/lib/liquid-glass-params";
 
 /**
- * 液态玻璃面板材质（实验室实验）。
+ * 液态玻璃面板特效（实验室实验）。
  *
  * 用 [liquid-glass-webgl](https://github.com/martin65536/liquid-glass-webgl)
  * 的 WebGL 渲染器（AGPL-3.0，见根目录 LICENSE 与 README）。

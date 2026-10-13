@@ -42,7 +42,7 @@ export type LabId =
  * 两组回答的是不同的问题，因此跨组可以自由组合：
  *   material —— 外观材质：底色、强调色、字体这类「整体长相」（实底、
  *               描边、书本、赛博朋克）；
- *   surface  —— 面板材质：面板表面是什么（亚克力 / 玻璃），只看
+ *   surface  —— 面板特效：面板表面是什么（亚克力 / 玻璃），只看
  *               背景图和令牌结构，跟整体长相是两件事。
  */
 export type LabGroupId = "material" | "surface";
@@ -53,8 +53,8 @@ export const LAB_GROUPS: Record<LabGroupId, { label: string; hint: string }> = {
     hint: "同一组里只能开一个：再开另一个，前一个会自动关掉。",
   },
   surface: {
-    label: "面板材质",
-    hint: "与上面的外观材质互不相干，可以自由组合。随便自由组合可能导致糟糕的后果，比如 ⌈液态玻璃⌋ + ⌈书本⌋ + 浅色模式 。不信可以试试。",
+    label: "面板特效",
+    hint: "与上面的外观材质互不相干，可以自由组合，但可能导致糟糕的后果，比如 ⌈液态玻璃⌋ + ⌈书本⌋ + 浅色模式 。不信可以试试。",
   },
 };
 
@@ -164,7 +164,7 @@ export const LABS: readonly Lab[] = [
     description:
       "去掉背景图：浅色换成米黄纸面、深色换成深灰纸面。「纸面 + 字体」档再把全站换成宋体和 Times New Roman，代码块保持等宽。",
     caveat:
-      "中文宋体用的是系统自带字体（Windows 是中易宋体、macOS 是宋体-简），小字号会显得偏细；与「液态玻璃」同开时，玻璃没有背景图可折射，不会生效。",
+      "与「液态玻璃」同开时，玻璃没有背景图可折射，不会生效。",
     options: [
       { value: "", label: "默认" },
       { value: "paper", label: "纸面" },
@@ -177,7 +177,7 @@ export const LABS: readonly Lab[] = [
     group: "material",
     label: "赛博朋克",
     description:
-      "深蓝黑底、霓虹青强调色、选中文字浮夸品红，面板描边带一点青光。锁定夜间模式：主题开关在这条实验开着时不生效。",
+      "深蓝黑底、霓虹青强调色、选中文字浮夸品红，面板描边带一点青光。锁定夜间模式。",
   },
   {
     kind: "switch",
@@ -186,18 +186,18 @@ export const LABS: readonly Lab[] = [
     runtime: "liquidglass",
     label: "液态玻璃",
     description:
-      "面板换成一块真“玻璃”，iOS风格：实时折射背后的背景，边缘压缩、倒角高光，G2 连续曲率圆角。依赖 WebGL 。",
+      "面板换成一块真“玻璃”，iOS风格。依赖 WebGL 。",
     warning:
-      "实验性效果：玻璃可能跟不上滚动和动画（会滞后一两帧）、超长正文面板效果较差、文字与背景的对比度可能会降低、在老设备上会掉帧。不合适就关掉。",
+      "实验性效果：玻璃可能跟不上滚动和动画、超长正文面板效果较差、文字与背景的对比度可能会降低、在老设备上会掉帧。只在 chromium 系浏览器全面验证过。",
     caveat:
-      "超长文章的面板另走一条便宜的 SVG 滤镜路线。开启后整页背景交给画布绘制；顶栏底栏、以及超过 24 块的其余面板保持原本的亚克力外观。该路线依赖 backdrop-filter 里的 SVG 滤镜，Firefox 下正文与文章里的卡片会退回亚克力外观。",
+      "超长文章的面板另走一条便宜的 SVG 滤镜路线。开启后整页背景交给画布绘制；顶栏底栏、以及超过 24 块的其余面板保持原本的亚克力外观。Firefox 下正文与文章里的卡片会退回亚克力外观。",
   },
   {
     kind: "switch",
     id: "typewriter",
     label: "打字机",
     description: "全站换成等宽字体，正文行距收紧一点。",
-    caveat: "中文会回退到系统中文字体，主要变化在数字和拉丁字母上。",
+    caveat: "中文可能会回退到系统中文字体，主要变化在数字和拉丁字母上。",
   },
   {
     kind: "switch",
@@ -211,7 +211,7 @@ export const LABS: readonly Lab[] = [
     kind: "choice",
     id: "corners",
     label: "圆角",
-    description: "面板和控件的圆角，分三档。不保证覆盖所有控件；“液态玻璃”实验下切换圆角需要刷新页面生效。",
+    description: "面板和控件的圆角，分三档。不保证覆盖所有控件。",
     options: [
       { value: "", label: "默认" },
       { value: "square", label: "直角" },
