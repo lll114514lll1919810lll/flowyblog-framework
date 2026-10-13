@@ -50,8 +50,7 @@ const MAX_NAME = 24;
 
 /** 顶层留言每页条数。回复不占页数——它们跟着自己的根留言走 */
 const COMMENTS_PER_PAGE = 10;
-/** 超过这个字数（或换行数）的留言默认折叠，点「展开全文」看全部 */
-const COLLAPSE_CHARS = 150;
+/** 超过这个换行数（视觉上已经是一大块）的留言默认折叠，点「展开全文」看全部 */
 const COLLAPSE_LINES = 6;
 /** 回复楼的折叠：超过这个条数的楼层默认收起，只露出最早的几条 */
 const REPLIES_COLLAPSE_AT = 3;
@@ -686,13 +685,13 @@ export function Comments({ page }: { page: string }) {
     const replyCount = replies.length;
 
     /*
-     * 长留言默认折叠：字数超阈值，或换行多到肉眼已经是一大块（几十个
-     * 字换一行也够长）。折叠用 line-clamp 截断而不是按字数切片——
+     * 长留言默认折叠：换行超过阈值，视觉上已经是一大块。
+     * 字数不参与判断——多少字算「长」因内容而异，纯文字型长留言
+     * 不折行也不碍事，折叠只为压掉那种竖着撑很高的大块。
+     * 折叠用 line-clamp 截断而不是按行切片——
      * 切片会丢掉 mid-text 的换行和排版，clamp 保留原样只裁显示高度。
      */
-    const isLong =
-      c.text.length > COLLAPSE_CHARS ||
-      c.text.split("\n").length > COLLAPSE_LINES;
+    const isLong = c.text.split("\n").length > COLLAPSE_LINES;
     const expanded = expandedIds.has(c.id);
     const threadOpen = threadOpenIds.has(c.id);
 
