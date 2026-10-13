@@ -299,7 +299,7 @@ function panelToElement(
     判据是「在不在 <main> 里」，不是标签名。
 
     按标签名排除 HEADER/FOOTER 会误伤：页面上的 `page-hero` 也是 <header>
-    （见 /blog、/lab 的页头），它们本该和别的面板一样有玻璃，结果一直没有。
+    （见 /blog、/settings 的页头），它们本该和别的面板一样有玻璃，结果一直没有。
     而顶栏底栏都渲染在 <main> 外面——`app/layout.tsx` 里它们在
     `PageTransition` 之外，`<main>` 由 `page-transition.tsx` 渲染——
     所以这个边界正好只把站点外框划出去。
@@ -640,7 +640,7 @@ export function LiquidGlassPanels() {
       /*
         降级是「这台浏览器的能力」问题，不是「当前页面」的问题：便宜版在
         Firefox 上根本不生效，而文章页一定会用到它。所以只要浏览器不支持，
-        这个实验整体就是降级状态——否则用户在 /lab 上看不到任何说明
+        这个实验整体就是降级状态——否则用户在 /settings 上看不到任何说明
         （那一页没有正文面板，degraded 永远不会被置位），到了文章页才发现
         正文没了玻璃，却不知道原因。
       */

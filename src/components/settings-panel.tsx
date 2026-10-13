@@ -2,7 +2,14 @@
 
 import { useLayoutEffect } from "react";
 import { LabGlassPlayground } from "@/components/lab-glass-playground";
-import { LABS, LAB_GROUPS, LAB_SOLO, type Lab, type LabGroupId } from "@/lib/labs";
+import {
+  LABS,
+  LAB_GROUPS,
+  LAB_SOLO,
+  STABLE_LAB_IDS,
+  type Lab,
+  type LabGroupId,
+} from "@/lib/labs";
 import {
   useLabRuntimeStatus,
   type LabRuntimeStatus,
@@ -10,15 +17,17 @@ import {
 import { useLabReapply, useLabs } from "@/lib/use-labs";
 
 /**
- * 实验室开关面板。
+ * 外观设置面板（/settings）。
  *
- * 页面按 LABS 的顺序渲染，同组的实验自动聚到一个小标题下——
- * 分组信息来自实验清单，不在这里手写，加一个组员不用改组件。
+ * 开关分两区：「稳定」是已定稿、可长期使用的外观；「实验」是还在试验的
+ * 想法，随时可能改效果或下线。两区共用同一份状态（lib/labs.ts 的
+ * data-lab-* 属性 + localStorage），分区的依据是 STABLE_LAB_IDS——
+ * 实验转正只需把 id 挪进那份清单，本组件不用改。
  *
  * 外观完全由 CSS 按 <html data-lab-*> 决定（见 globals.css 的实验室段），
  * React 只负责点击和把属性读出来显示，和主题开关同一套做法。
  */
-export function LabPanel() {
+export function SettingsPanel() {
   const { valueOf, activeCount, set, toggle, clear } = useLabs();
 
   /**
@@ -30,12 +39,17 @@ export function LabPanel() {
     reapply();
   }, [reapply]);
 
+  const stable = LABS.filter((lab) => STABLE_LAB_IDS.includes(lab.id));
+  const experimental = LABS.filter((lab) => !STABLE_LAB_IDS.includes(lab.id));
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="panel flex flex-col gap-5 px-5 py-5 sm:px-6">
+      <div className="panel flex flex-col gap-6 px-5 py-5 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-secondary">
-            {activeCount > 0 ? `外观实验：正在测试 ${activeCount} 项外观` : "外观实验：当前都是默认外观"}
+            {activeCount > 0
+              ? `正在使用 ${activeCount} 项外观设置`
+              : "当前是默认外观"}
           </p>
           <button
             type="button"
@@ -47,40 +61,23 @@ export function LabPanel() {
           </button>
         </div>
 
-        {groupIntoSections(LABS).map((section) => {
-          // 每一段都有标题：互斥组用组名，其余归到「独立实验」。
-          // 只给互斥组加标题是不够的——它下面那几项样式一样、又没有分界，
-          // 看上去就成了同一组的成员。
-          const meta = section.group ? LAB_GROUPS[section.group] : LAB_SOLO;
+        <LabGroupSection
+          title="稳定"
+          description="已经定稿的外观，可以放心长期使用。"
+          labs={stable}
+          valueOf={valueOf}
+          onSet={set}
+          onToggle={toggle}
+        />
 
-          return (
-            <section key={section.key} className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <h2 className="lab-group-title">{meta.label}</h2>
-                <p className="text-xs leading-relaxed text-muted">{meta.hint}</p>
-              </div>
-
-              {/* 互斥组的成员再套一层内嵌面板：小标题说明「这是一组」，
-                  框说明「框里的才是一组」。 */}
-              <ul className={section.group ? "lab-list is-grouped" : "lab-list"}>
-                {section.labs.map((lab) => (
-                  <LabRow
-                    key={lab.id}
-                    lab={lab}
-                    value={valueOf(lab.id)}
-                    onSet={(value) => set(lab.id, value)}
-                    onToggle={() => toggle(lab.id)}
-                    /* 液态玻璃开了之后有一堆参数要调，面板就摆在开关下面：
-                       放到页面底部的话，调完一次滑上去看效果就得来回滚 */
-                    extra={
-                      lab.id === "liquidglass" ? <LabGlassPlayground /> : undefined
-                    }
-                  />
-                ))}
-              </ul>
-            </section>
-          );
-        })}
+        <LabGroupSection
+          title="实验"
+          description="还在试验中的想法，随时可能修改或取消，遇到问题就关掉。"
+          labs={experimental}
+          valueOf={valueOf}
+          onSet={set}
+          onToggle={toggle}
+        />
       </div>
 
       {/*
@@ -112,9 +109,73 @@ export function LabPanel() {
 /** 面板底部的说明条目。短句、一句一件事，别写成一整段 */
 const NOTES = [
   "选择只保存在你这台设备的浏览器里，不会同步给别人，也不影响文章内容。",
-  "实验随时可能改效果或下线，遇到问题就恢复默认。",
+  "「实验」区的选项随时可能改效果或下线，遇到问题就恢复默认。",
   "恢复默认之后页面会立刻变回去，不需要刷新。",
 ];
+
+/** 一大区（稳定/实验）的渲染：标题 + 说明，内部再按互斥组切成小段。 */
+function LabGroupSection({
+  title,
+  description,
+  labs,
+  valueOf,
+  onSet,
+  onToggle,
+}: {
+  title: string;
+  description: string;
+  labs: readonly Lab[];
+  valueOf: (id: Lab["id"]) => string;
+  onSet: (id: Lab["id"], value: string) => void;
+  onToggle: (id: Lab["id"]) => void;
+}) {
+  if (labs.length === 0) return null;
+
+  return (
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        <p className="text-sm leading-relaxed text-secondary">{description}</p>
+      </div>
+
+      {/*
+        同一互斥组的成员自动聚到一个小标题下——分组信息来自实验清单，
+        不在这里手写，加一个组员不用改组件。
+        互斥组的成员再套一层内嵌面板：小标题说明「这是一组」，
+        框说明「框里的才是一组」。
+      */}
+      {groupIntoSections(labs).map((section) => {
+        const meta = section.group ? LAB_GROUPS[section.group] : LAB_SOLO;
+
+        return (
+          <div key={section.key} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <h3 className="lab-group-title">{meta.label}</h3>
+              <p className="text-xs leading-relaxed text-muted">{meta.hint}</p>
+            </div>
+
+            <ul className={section.group ? "lab-list is-grouped" : "lab-list"}>
+              {section.labs.map((lab) => (
+                <LabRow
+                  key={lab.id}
+                  lab={lab}
+                  value={valueOf(lab.id)}
+                  onSet={(value) => onSet(lab.id, value)}
+                  onToggle={() => onToggle(lab.id)}
+                  /* 液态玻璃开了之后有一堆参数要调，面板就摆在开关下面：
+                     放到页面底部的话，调完一次滑上去看效果就得来回滚 */
+                  extra={
+                    lab.id === "liquidglass" ? <LabGlassPlayground /> : undefined
+                  }
+                />
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
 
 /**
  * 按互斥组把实验清单切成若干段。

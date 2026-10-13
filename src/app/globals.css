@@ -1108,7 +1108,7 @@
   }
 
   /* ==========================================================================
-     实验室开关（/lab 页）
+     外观设置开关（/settings 页）
 
      和主题开关长得像但是两件事：主题开关是二选一的常态，位置由
      <html data-theme> 决定；这里是可叠加的实验，每行一枚、各自独立。
@@ -2340,7 +2340,7 @@ html {
 /* ============================================================================
    实验：「静止」——关闭所有动画
    写法与上面的系统级 reduced-motion 完全同构，只是触发条件换成
-   <html data-lab-still="on">（开关在 /lab，见 lib/labs.ts）。
+   <html data-lab-still="on">（开关在 /settings，见 lib/labs.ts）。
    JS 侧的缓动滚动也读这个属性（lib/scroll.ts），否则目录跳转仍在飞。
    ========================================================================= */
 
@@ -3321,10 +3321,13 @@ html {
 }
 
 /* --- 书本 -----------------------------------------------------------------
-   去掉背景图，整站回到「纸面」：浅色是米黄纸、深色是深灰纸；
-   字体换成衬线——西文 Times New Roman、中文宋体，代码块除外：
+   去掉背景图，整站回到「纸面」：浅色是米黄纸、深色是深灰纸。
+   两个档位：paper 只换纸面配色；full 在纸面之上再把字体换成衬线——
+   西文 Times New Roman、中文宋体，代码块除外：
    pre/code 的等宽字体来自浏览器默认样式和 Tailwind preflight，
    不走根元素的 font-family，所以只改根字体栈就伤不到代码。
+   字体单独拆档是因为「要不要宋体」和「要不要纸面」是两个口味，
+   强绑在一起总有人得为不想要的那半忍着。
 
    面板同时从「亚克力」换成「纸页」：不透明、无高光、无模糊。
    阴影不写成 none（原因见上面「面板材质」的注释），而是压到很轻，
@@ -3333,7 +3336,8 @@ html {
    主题的分法和上面那两份深色令牌块相同：跟随系统用媒体查询，
    手动选择用属性选择器，各写一份。浅色那份还得挡住「系统深色 +
    书本开着」的情况——媒体查询只认 light 才落纸色。 */
-:root[data-lab-book="on"] {
+:root[data-lab-book="paper"],
+:root[data-lab-book="full"] {
   --bg-image: none;
   --bg-scrim: none;
   /* 纯色纸面上文字描边只会发糊，关掉（默认那套描边是给背景图用的） */
@@ -3341,6 +3345,10 @@ html {
   --panel-highlight: transparent;
   --panel-blur: 0px;
   --panel-saturate: 100%;
+}
+
+/* 「纸面 + 字体」档的衬线字体栈 */
+:root[data-lab-book="full"] {
   font-family:
     "Times New Roman", "Songti SC", SimSun, "NSimSun", "Noto Serif CJK SC",
     "Source Han Serif SC", serif;
@@ -3349,7 +3357,8 @@ html {
 /* 浅色：米黄纸 + 墨色字。强调色跟着换成土黄（赭石），蓝压在暖纸上是
    全书唯一的冷色，太跳；土黄 #8a5f10 压米黄纸实测 ≈5.0:1（AA 达标）。 */
 @media (prefers-color-scheme: light) {
-  :root[data-lab-book="on"] {
+  :root[data-lab-book="paper"],
+  :root[data-lab-book="full"] {
     --background: #f6f0e1;
     --surface: #ede4cf;
     --foreground: #29261f;
@@ -3368,7 +3377,8 @@ html {
 }
 
 /* 手动选了浅色主题：上面的媒体查询不命中，单独补一份 */
-:root[data-lab-book="on"][data-theme="light"] {
+:root[data-lab-book="paper"][data-theme="light"],
+:root[data-lab-book="full"][data-theme="light"] {
   --background: #f6f0e1;
   --surface: #ede4cf;
   --foreground: #29261f;
@@ -3389,7 +3399,8 @@ html {
    深灰纸的对比靠明度差而不是色相差。强调色同样换土黄，
    提亮成 #d9a441 压深灰纸实测 ≈6.7:1。 */
 @media (prefers-color-scheme: dark) {
-  :root[data-lab-book="on"]:not([data-theme="light"]) {
+  :root[data-lab-book="paper"]:not([data-theme="light"]),
+  :root[data-lab-book="full"]:not([data-theme="light"]) {
     --background: #26262a;
     --surface: #313136;
     --foreground: #e6e3da;
@@ -3408,7 +3419,8 @@ html {
 }
 
 /* 手动选了深色主题：同样单独补一份 */
-:root[data-lab-book="on"][data-theme="dark"] {
+:root[data-lab-book="paper"][data-theme="dark"],
+:root[data-lab-book="full"][data-theme="dark"] {
   --background: #26262a;
   --surface: #313136;
   --foreground: #e6e3da;

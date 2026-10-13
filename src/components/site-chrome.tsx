@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { CONTENT_MAX_WIDTH, LICENSE, siteConfig } from "@/lib/site";
 import { AdminEntry } from "@/components/admin-entry";
-import { LinkPending } from "@/components/link-pending";
 import { MobileNav } from "@/components/mobile-nav";
 import { SiteLogo } from "@/components/site-logo";
 import { SiteNav } from "@/components/site-nav";
@@ -96,7 +94,7 @@ export function SiteFooter() {
               href="https://github.com/lll114514lll1919810lll/flowyblog-framework"
               target="_blank"
               rel="noreferrer"
-              className="transition-colors hover:text-foreground"
+              className="text-accent transition-colors hover:text-[var(--accent)]/80"
             >
               FlowyBlog Framework
             </a>
@@ -140,45 +138,13 @@ export function SiteFooter() {
             </a>
           </span>
 
-          {/* 实验室入口放在授权这一行的最右端。
-              它自己也占一个「组」而不是混进上面两组之一：
-              justify-between 下底栏是「左版权、右元信息」两块，
-              把它单独做成第三个子项会被顶到正中间，孤零零一个链接
-              悬在两块内容之间。留在这行里就是右对齐的第三个短项。
-
-              加一枚烧瓶图标是因为它和旁边两条性质不同：
-              那两条是「内容/源码各自的协议」，这条是一个页面。
-              图标承担「这里不是协议」的区分，同时不抢视线。
-              也不进顶栏——实验室是给愿意折腾的人准备的暗门，
-              顶栏四个入口对应的是站点的四类内容，不该和它并列。 */}
-          <span className="whitespace-nowrap">
-            <Link
-              href="/lab"
-              className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                className="h-3.5 w-3.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M9.5 3h5M10.5 3v6.3L5.9 17.5A2 2 0 0 0 7.7 20.5h8.6a2 2 0 0 0 1.8-3L13.5 9.3V3" />
-              </svg>
-              <LinkPending>实验室</LinkPending>
-            </Link>
-          </span>
-
-          {/* 后台入口紧跟在实验室后面，同样是一个「页面」性质的短项。
+          {/* 后台入口在授权这一行的最右端。
               只有已登录的管理员才渲染（组件内部探测），访客看到的是空白，
               所以它的有无不影响上面那几项的排布。
 
-              放在这里而不是顶栏：顶栏那四个链接对应站点的四类内容，后台是
-              站点管理，不属于其中任何一类；而底栏右端本来就是「元信息」区，
-              内容/源码/实验室都在这儿。 */}
+              放在这里而不是顶栏：顶栏那五个链接对应站点的五类内容，
+              后台是站点管理，不属于其中任何一类；而底栏右端本来就是
+              「元信息」区，内容/源码的协议都在这儿。 */}
           <AdminEntry />
         </p>
       </div>

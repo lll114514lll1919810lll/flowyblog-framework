@@ -54,10 +54,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
     { url: `${base}/tags/`, changeFrequency: "weekly", priority: 0.6 },
     { url: `${base}/about/`, changeFrequency: "yearly", priority: 0.5 },
-    // 实验室：底栏有入口，页面上没有常读内容，只给很低的权重。
+    // 设置页：顶栏有入口，页面上没有常读内容，只给很低的权重。
     // 不收录不行——它是个公开页面，被外链引到时爬虫照样会来；
     // 这里只是明确告诉搜索引擎「它不是站点的重点」。
-    { url: `${base}/lab/`, changeFrequency: "monthly", priority: 0.2 },
+    { url: `${base}/settings/`, changeFrequency: "monthly", priority: 0.2 },
 
     // 文章：lastModified 用文章自己的日期（YYYY-MM-DD）。
     // 统一转成 UTC 是因为 sitemap 协议要求 W3C Date 格式，

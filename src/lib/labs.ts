@@ -157,14 +157,19 @@ export const LABS: readonly Lab[] = [
     caveat: "文字直接压在背景图上，遇到花的背景可能不好读。",
   },
   {
-    kind: "switch",
+    kind: "choice",
     id: "book",
     group: "material",
     label: "书本",
     description:
-      "去掉背景图：浅色换成米黄纸面、深色换成深灰纸面，全站改用宋体和 Times New Roman，代码块保持等宽。",
+      "去掉背景图：浅色换成米黄纸面、深色换成深灰纸面。「纸面 + 字体」档再把全站换成宋体和 Times New Roman，代码块保持等宽。",
     caveat:
       "中文宋体用的是系统自带字体（Windows 是中易宋体、macOS 是宋体-简），小字号会显得偏细；与「液态玻璃」同开时，玻璃没有背景图可折射，不会生效。",
+    options: [
+      { value: "", label: "默认" },
+      { value: "paper", label: "纸面" },
+      { value: "full", label: "纸面 + 字体" },
+    ],
   },
   {
     kind: "switch",
@@ -217,6 +222,15 @@ export const LABS: readonly Lab[] = [
 
 /** localStorage 键名。和主题分开存，清掉一个不影响另一个 */
 export const LAB_STORAGE_KEY = "fbz-labs";
+
+/**
+ * 已在设置页（/settings）「稳定」区转正的实验。
+ *
+ * 转正只是展示位置的挪动：它们仍在 LABS 清单里——内联引导脚本、
+ * 互斥校验、存储格式都靠这份清单驱动，摘出去就全断了。
+ * 设置页按这份清单分「稳定 / 实验」两区，实验室面板已成历史。
+ */
+export const STABLE_LAB_IDS: readonly LabId[] = ["flat", "book", "corners"];
 
 /** 属性名前缀：data-lab-<id>。和实验的 id 一一对应，不共享一个属性 */
 export const labAttr = (id: LabId) => `data-lab-${id}`;
