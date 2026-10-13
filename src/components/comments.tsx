@@ -723,7 +723,7 @@ export function Comments({ page }: { page: string }) {
               type="button"
               onClick={() => toggleExpanded(c.id)}
               aria-expanded={expanded}
-              className="mt-1.5 text-xs text-muted transition-colors hover:text-accent"
+              className="mt-1.5 text-xs text-accent transition-colors hover:text-[var(--accent)]/80"
             >
               {expanded ? "收起" : "展开全文"}
             </button>
@@ -753,7 +753,7 @@ export function Comments({ page }: { page: string }) {
                 type="button"
                 onClick={() => toggleThread(c.id)}
                 aria-expanded={threadOpen}
-                className="mt-2 text-xs text-muted transition-colors hover:text-accent"
+                className="mt-2 text-xs text-accent transition-colors hover:text-[var(--accent)]/80"
               >
                 {threadOpen
                   ? "收起回复"
