@@ -118,15 +118,18 @@ export default function AboutPage() {
 
           <h2>关于我</h2>
           <p>
-            一个热爱技术与 AI 、喜欢分享的普通人。你可以在{" "}
-            <a
-              href={siteConfig.github}
-              target="_blank"
-              rel="noreferrer"
-            >
-              GitHub
-            </a>{" "}
-            找到我。
+            一个热爱技术与 AI 、喜欢分享的普通人。
+            {/* GitHub 主页是可选配置（site.ts 留空 = 站长没填），
+                留空时整句不渲染，否则会出现空链接或指向默认值的链接 */}
+            {siteConfig.github && (
+              <>
+                {" "}你可以在{" "}
+                <a href={siteConfig.github} target="_blank" rel="noreferrer">
+                  GitHub
+                </a>{" "}
+                找到我。
+              </>
+            )}
           </p>
 
         </div>

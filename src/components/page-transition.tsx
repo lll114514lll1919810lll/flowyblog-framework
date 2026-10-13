@@ -38,9 +38,11 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
   return (
     <ViewTransition key={pathname} name="page" default="page-fade" update="none">
       {/* 与顶栏/底栏共用同一个宽度常量，三者左右严格对齐。
-          文章页内部还会按用户选择进一步约束正文宽度。 */}
+          移动端水平内边距用 px-4 和顶栏对齐——原来正文用 px-6，
+          比顶栏还缩进 8px，文章卡片离屏幕边缘太远显得窄。
+          sm 起恢复 px-6；文章页内部还会按用户选择进一步约束正文宽度。 */}
       <main
-        className="mx-auto w-full flex-1 px-6 py-10 sm:py-14"
+        className="mx-auto w-full flex-1 px-4 py-10 sm:px-6 sm:py-14"
         style={{ maxWidth: CONTENT_MAX_WIDTH }}
       >
         {children}

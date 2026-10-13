@@ -80,7 +80,7 @@ export function SiteFooter() {
        收到 16px 后整条更像一条收尾的分隔线。 */
     <footer className={`${BAR} mt-auto w-full border-b-0`}>
       <div
-        className="mx-auto flex flex-col gap-3 px-6 py-4 text-[13px] text-muted sm:flex-row sm:items-end sm:justify-between"
+        className="mx-auto flex flex-col gap-3 px-4 py-4 text-[13px] text-muted sm:flex-row sm:items-end sm:justify-between sm:px-6"
         style={{ maxWidth: CONTENT_MAX_WIDTH }}
       >
         <div className="flex flex-col gap-1">

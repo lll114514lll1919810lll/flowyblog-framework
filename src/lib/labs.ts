@@ -28,7 +28,8 @@ export type LabId =
   | "book"
   | "cyberpunk"
   | "liquidglass"
-  | "corners";
+  | "corners"
+  | "still";
 
 /**
  * 互斥组的 id。
@@ -192,6 +193,14 @@ export const LABS: readonly Lab[] = [
     label: "打字机",
     description: "全站换成等宽字体，正文行距收紧一点。",
     caveat: "中文会回退到系统中文字体，主要变化在数字和拉丁字母上。",
+  },
+  {
+    kind: "switch",
+    id: "still",
+    label: "静止",
+    description:
+      "停掉全站所有动画和过渡：状态变化全部瞬间到位，包括页面切换、入场动画和目录跳转的平滑滚动。",
+    caveat: "与系统的「减少动态效果」同效果，但只对本站生效。液态玻璃的 WebGL 渲染不归它管。",
   },
   {
     kind: "choice",

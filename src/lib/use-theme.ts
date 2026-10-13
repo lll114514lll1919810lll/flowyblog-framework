@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { prefersReducedMotion } from "@/lib/scroll";
 import {
   DARK_QUERY,
   THEME_STORAGE_KEY,
@@ -132,7 +133,8 @@ export function toggleTheme(origin?: { x: number; y: number }) {
   };
 
   const doc = document as ViewTransitionDocument;
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // 用共享判断：系统的「减少动态效果」和实验室的「静止」开关都要求直接切
+  const reduceMotion = prefersReducedMotion();
 
   // 没给圆心 / 用户要求减少动效 / 浏览器不支持，就直接切
   if (!origin || reduceMotion || typeof doc.startViewTransition !== "function") {

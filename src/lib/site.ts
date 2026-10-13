@@ -16,7 +16,9 @@ export const siteConfig = {
   // 正式域名。部署后改成自己的域名，sitemap 等会用到；
   // Cloudflare Pages 每次推送都会重新构建，改这里之后要 push 才生效。
   url: "https://lll114514lll1919810lll.github.io/flowyblog-framework",
-  github: "https://github.com/lll114514lll1919810lll",
+  // GitHub 个人主页，「关于」页的入口。留空（默认）就不渲染那句链接——
+  // 出厂默认不能带上框架作者的主页，运行 setup 向导的站点配置步时填写。
+  github: "",
   // 博客源码仓库。页脚「源码」链接（AGPL 要求向使用者提供完整源码，
   // 指向仓库才算履行）和关于页都指向这里，所以单独存一份，不和 github
   // 混用——那个是作者主页，不是源码地址。部署时改成自己的仓库地址。

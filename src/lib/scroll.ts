@@ -7,8 +7,11 @@
  * 两条额外处理：
  * 1. 目标标题不能被吸顶导航挡住。把目标位置对齐到视口 1/3 处，
  *    自然就避开了顶栏，也和目录高亮的判定标准保持一致。
- * 2. 尊重系统的「减少动态效果」：开启时直接跳，不做缓动。
+ * 2. 尊重系统的「减少动态效果」和实验室的「静止」开关：
+ *    任一开启时直接跳，不做缓动。
  */
+
+import { labAttr } from "@/lib/labs";
 
 /** 三次缓出：起步快、收尾稳，长距离也不拖沓。 */
 function easeOutCubic(t: number): number {
@@ -17,6 +20,9 @@ function easeOutCubic(t: number): number {
 
 export function prefersReducedMotion(): boolean {
   if (typeof window === "undefined") return false;
+  // 实验室的「静止」开关（data-lab-still）也要求停掉 JS 缓动：
+  // 上面的 CSS 全局规则只能管住 CSS 动画，rAF 驱动的滚动得在这里拦
+  if (document.documentElement.hasAttribute(labAttr("still"))) return true;
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 

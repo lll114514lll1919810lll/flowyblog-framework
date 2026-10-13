@@ -61,7 +61,7 @@ export function PostBody({
       data-reading-width={widthId}
       data-font-size={sizeId}
     >
-      {/* 放不下时目录挤在顶部，收进一个折叠按钮 */}
+      {/* 放不下侧栏时收成悬浮球：页面右上角小圆按钮，点开弹出目录面板 */}
       <div className="toc-top-slot">
         <TableOfContents variant="collapsible" items={toc} />
       </div>

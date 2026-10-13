@@ -365,6 +365,10 @@ function Sidebar({ items }: { items: TocItem[] }) {
                       点了收起也会被立刻强制展开，让人以为按钮坏了。
                       用 aria-disabled 而不是 disabled —— disabled 会让
                       按钮失去焦点，键盘用户会以为这里没有控件。
+
+                      before: 伪元素是不可见的扩大热区（上下 4px、左 12px、
+                      右 8px）：按钮本体只有十几像素宽，手指很难点准。
+                      移动端悬浮面板的同一枚按钮用同一套写法。
                     */
                     onClick={locked ? undefined : () => toggle(node.id)}
                     aria-expanded={open}
@@ -375,7 +379,7 @@ function Sidebar({ items }: { items: TocItem[] }) {
                         : `${open ? "收起" : "展开"}${node.text}的子章节`
                     }
                     title={locked ? "当前所在章节，自动展开" : undefined}
-                    className={`-ml-px flex shrink-0 items-center self-stretch border-l border-transparent py-1.5 pl-1.5 transition-opacity ${
+                    className={`relative -ml-px flex shrink-0 items-center self-stretch border-l border-transparent py-1.5 pl-1.5 transition-opacity before:absolute before:-bottom-1 before:-left-3 before:-right-2 before:-top-1 before:content-[''] ${
                       locked
                         ? "cursor-default text-muted opacity-45"
                         : "text-muted hover:text-foreground"
@@ -467,12 +471,18 @@ function Sidebar({ items }: { items: TocItem[] }) {
 }
 
 /**
- * 移动端折叠版：整体收进一个按钮里，展开后同样是「二级标题 + 可展开子项」。
+ * 移动端悬浮球版：页面右上角一个小圆按钮，点击后弹出目录面板。
  *
- * 只有整体展开后才启用滚动高亮，收起时不浪费观察器。
+ * 面板复用 .panel .toc-collapsible 的既有样式（标题行 + 二级标题 +
+ * 可展开子项），入场以右上角为变换原点做缩放 + 淡入，和悬浮球衔接。
+ * 收起时机：再点一次球、点面板头部行、点条目跳转、点面板外任意处。
+ *
+ * 只在展开后才启用滚动高亮，收起时不浪费观察器。
  */
 function Collapsible({ items }: { items: TocItem[] }) {
   const [open, setOpen] = useState(false);
+  // 点面板外收起需要判定点击目标是否在球/面板内
+  const rootRef = useRef<HTMLDivElement>(null);
   const activeId = useActiveHeading(open ? items : []);
   const tree = useMemo(() => buildTree(items), [items]);
 
@@ -480,55 +490,95 @@ function Collapsible({ items }: { items: TocItem[] }) {
   const { activeGroupId, manualId, closingId, toggle: toggleGroup } =
     useTocGroups(tree, activeId);
 
-  return (
-    /* 标题行和展开内容装在同一个面板里，整块只有一圈圆角。
-       原来是两个面板（标题一个 .panel、列表一个 .panel-raised .rounded-lg）
-       上下紧贴，展开时接缝两侧会各露出一个内凹的弧度，
-       看起来像两块圆角硬拼在一起，而不是一个可折叠的面板。
+  // 展开期间监听全文档按下：目标在球和面板之外就收起。
+  // 用 pointerdown 而不是 click，滚动中拖动的手势也能正确响应。
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
 
-       toc-collapsible：globals.css 按它给条目链接设定随字号档位
-       缩放的字号（.toc-collapsible a）。 */
-    <div className="panel toc-collapsible">
+  /** 点条目：平滑滚动到锚点后收起面板，地址栏同步但不留历史 */
+  const jump = (id: string) => {
+    scrollToAnchor(id);
+    setOpen(false);
+    window.history.replaceState(null, "", `#${encodeURIComponent(id)}`);
+  };
+
+  return (
+    <div ref={rootRef}>
+      {/* 悬浮球：panel 提供底色/边框/阴影，圆形和尺寸交给 .toc-fab */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between px-4 py-2.5 text-sm"
+        aria-controls="toc-fab-panel"
+        aria-label={open ? "收起本文目录" : "打开本文目录"}
+        className="panel toc-fab"
       >
-        <span className="font-medium">本文目录</span>
-        <span className="flex items-center gap-2 text-xs text-muted">
-          {tree.length} 节
+        {/* 两个图标叠在同一位置：关闭时显示目录图标，展开时旋出 ✕，
+            用 scale + rotate 的交叉过渡，比硬切图标顺滑 */}
+        <span className="relative block h-4 w-4" aria-hidden="true">
           <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
             fill="none"
-            aria-hidden
-            className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            className={`absolute inset-0 transition-all duration-200 ${
+              open ? "rotate-90 scale-50 opacity-0" : ""
+            }`}
           >
             <path
-              d="M2.5 4.5L6 8l3.5-3.5"
+              d="M5.5 4h8M5.5 8h8M5.5 12h8"
               stroke="currentColor"
               strokeWidth="1.5"
               strokeLinecap="round"
-              strokeLinejoin="round"
+            />
+            <circle cx="2.2" cy="4" r="1.1" fill="currentColor" />
+            <circle cx="2.2" cy="8" r="1.1" fill="currentColor" />
+            <circle cx="2.2" cy="12" r="1.1" fill="currentColor" />
+          </svg>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            className={`absolute inset-0 transition-all duration-200 ${
+              open ? "" : "-rotate-90 scale-50 opacity-0"
+            }`}
+          >
+            <path
+              d="M4 4l8 8M12 4l-8 8"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
             />
           </svg>
         </span>
       </button>
 
-      {/* 同样用 grid-rows 0fr→1fr 做高度过渡，保持挂载才有动画 */}
+      {/* 弹出面板：始终挂载（入场/退场都是 CSS 过渡），
+          closed 态 visibility:hidden 同时把它移出 Tab 顺序 */}
       <div
-        className={`grid transition-[grid-template-rows,opacity] duration-250 ease-out ${
-          open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-        }`}
+        id="toc-fab-panel"
+        aria-hidden={!open}
+        className={`panel toc-collapsible toc-fab-panel ${open ? "is-open" : ""}`}
       >
-        <ul className="overflow-hidden">
-          {/* 分隔线不用跟着 open 切换：收起时整个区域 opacity-0，
-              而且高度被裁成 0，画不出来 */}
-          <li className="border-t border-panel-edge p-3">
-            <ul className="space-y-0.5">
-              {tree.map((node) => {
+        {/* 头部行兼作收起按钮：和旧版折叠条一致的信息展示 */}
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="flex w-full shrink-0 items-center justify-between px-4 py-2.5 text-sm"
+        >
+          <span className="font-medium">本文目录</span>
+          <span className="text-xs text-muted">{tree.length} 节</span>
+        </button>
+
+        <ul className="toc-fab-list space-y-0.5 border-t border-panel-edge p-3">
+          {tree.map((node) => {
             const hasChildren = node.children.length > 0;
             const locked = node.id === activeGroupId;
             const groupOpen =
@@ -544,13 +594,7 @@ function Collapsible({ items }: { items: TocItem[] }) {
                     onClick={(e) => {
                       if (e.metaKey || e.ctrlKey || e.shiftKey) return;
                       e.preventDefault();
-                      scrollToAnchor(node.id);
-                      setOpen(false);
-                      window.history.replaceState(
-                        null,
-                        "",
-                        `#${encodeURIComponent(node.id)}`,
-                      );
+                      jump(node.id);
                     }}
                     className={`flex-1 py-1.5 transition-colors ${
                       activeId === node.id
@@ -573,7 +617,7 @@ function Collapsible({ items }: { items: TocItem[] }) {
                           : `${groupOpen ? "收起" : "展开"}${node.text}的子章节`
                       }
                       title={locked ? "当前所在章节，自动展开" : undefined}
-                      className={`flex shrink-0 items-center self-stretch py-1.5 pl-2 transition-opacity ${
+                      className={`relative flex shrink-0 items-center self-stretch py-1.5 pl-2 transition-opacity before:absolute before:-bottom-1 before:-left-3 before:-right-2 before:-top-1 before:content-[''] ${
                         locked
                           ? "cursor-default text-muted opacity-45"
                           : "text-muted hover:text-foreground"
@@ -599,40 +643,56 @@ function Collapsible({ items }: { items: TocItem[] }) {
                   )}
                 </div>
 
-                {hasChildren && groupOpen && (
-                  <ul className="space-y-0.5">
-                    {node.children.map((child) => (
-                      <li key={child.id}>
-                        <a
-                          href={`#${child.id}`}
-                          onClick={(e) => {
-                            if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-                            e.preventDefault();
-                            scrollToAnchor(child.id);
-                            setOpen(false);
-                            window.history.replaceState(
-                              null,
-                              "",
-                              `#${encodeURIComponent(child.id)}`,
-                            );
-                          }}
-                          className={`block py-1.5 pl-5 transition-colors ${
-                            activeId === child.id
-                              ? "font-medium text-accent"
-                              : "text-secondary hover:text-foreground"
+                {/* 子项列表始终挂载，用 grid-rows 0fr→1fr 过渡高度——
+                    与桌面侧栏（Sidebar 里的 .toc-sublist）同一套动效，
+                    两处抄两份是刻意的：结构差异大，强行抽象反而绕。
+                    groupOpen 已含「待收起」状态（closingId），
+                    跳章时旧分组先保持展开、延迟后再收，动画不抢戏。 */}
+                {hasChildren && (
+                  <div
+                    className={`toc-sublist grid transition-[grid-template-rows,opacity] duration-250 ease-out ${
+                      groupOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                    }`}
+                  >
+                    <ul className="overflow-hidden space-y-0.5">
+                      {node.children.map((child, childIndex) => (
+                        <li
+                          key={child.id}
+                          className={`transition-[opacity,transform] duration-200 ease-out ${
+                            groupOpen
+                              ? "translate-x-0 opacity-100"
+                              : "-translate-x-1 opacity-0"
                           }`}
+                          // 错峰入场：依次延迟 25ms，与桌面侧栏节奏一致
+                          style={
+                            groupOpen
+                              ? { transitionDelay: `${60 + childIndex * 25}ms` }
+                              : undefined
+                          }
                         >
-                          {child.text}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
+                          <a
+                            href={`#${child.id}`}
+                            onClick={(e) => {
+                              if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+                              e.preventDefault();
+                              jump(child.id);
+                            }}
+                            className={`block py-1.5 pl-5 transition-colors ${
+                              activeId === child.id
+                                ? "font-medium text-accent"
+                                : "text-secondary hover:text-foreground"
+                            }`}
+                          >
+                            {child.text}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </li>
             );
           })}
-            </ul>
-          </li>
         </ul>
       </div>
     </div>
