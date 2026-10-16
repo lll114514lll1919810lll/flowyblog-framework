@@ -7,9 +7,15 @@
  *   1. **不用 WebGL**。滤镜整条交给 CSS 的 `backdrop-filter: url(#f)`，
  *      由合成器负责——滚动、换页、动画都不需要跑一行 JS，也没有 FBO、
  *      没有 GPU 上下文上限。
- *   2. **位移场是公式算的**，不是物理推的：一个圆角矩形的有向距离，
- *      经 smoothstep 变成「离边缘多近」的权重，再把采样点沿径向往中心收。
- *      没有 LUT、没有第二张高光图。
+ *   2. **位移场是公式算的**，不是物理推的：一个圆角矩形的有向距离，线性映射
+ *      到环带 [0,1]，套一个圆弧剖面（边缘处斜率最大），方向取 SDF 的中心差分
+ *      梯度（表面法线）。没有 LUT、没有第二张高光图。
+ *      剖面和方向这两处没有沿用原版：原版用 smoothstep 当剖面、沿径向往中心
+ *      收。smoothstep 两端导数为零，边缘处斜率归零，做出来是「平切角」
+ *      （chamfer）而不是「圆角」（fillet）；径向在长边中段会斜着指向中心，
+ *      不是垂直于边。这两点是照
+ *      [hotcocoacanary 的液态玻璃原理篇](https://hotcocoacanary.github.io/2026/08/21/projects/design/01-%E6%B6%B2%E6%80%81%E7%8E%BB%E7%92%83-%E5%8E%9F%E7%90%86%E7%AF%87/)
+ *      的论证改的（它的上游参考是 ybouane/liquidglass）。
  *   3. **自归一化**：算完取最大位移当作 feDisplacementMap 的 scale，
  *      图里只编码相对值。位移量天然落在元素自身范围内，不会越界采样。
  *
@@ -76,10 +82,14 @@ const SMALL_PANEL_SIDE = 240;
 
 const cache = new Map<string, { url: string; scale: number }>();
 
-function smoothStep(edge0: number, edge1: number, x: number): number {
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
+/**
+ * 倒角锐度 K ∈ [0, 1)：圆弧剖面 t(u) = u·√(1-K) / √(1-K·u²) 里的那个 K。
+ *
+ * 剖面已归一化成 t(0)=0、t(1)=1：0 是等斜率斜面（平切角），K 越接近 1
+ * 边缘转折越急、越像真实圆弧倒角。0.6 是折中——位移在环带中段偏弱、
+ * 集中到贴边那几十个像素里，正是真玻璃边缘的样子。
+ */
+const ARC_SHARPNESS = 0.6;
 
 /** 圆角矩形的有向距离：内部为负、边界为 0、外部为正 */
 function roundedRectSdf(
@@ -139,6 +149,12 @@ export function cheapGlassMap(
   const rawY = new Float32Array(mapWidth * mapHeight);
   const halfWidth = width / 2;
   const halfHeight = height / 2;
+  // 梯度差分的步长：取「图上一个像素」对应的元素距离。
+  // SDF 在每个圆角的角平分线上有真实的尖点（不可导），差分步长太小会把
+  // 那道折痕带进方向场；取到一个图上像素宽，方向会平滑地转过去
+  const epsilon = Math.max(width / mapWidth, height / mapHeight);
+  // 圆弧剖面 t(1)=1 的归一化系数，提前算好
+  const arcNorm = Math.sqrt(1 - ARC_SHARPNESS);
   let maxDisplacement = 0;
 
   for (let py = 0; py < mapHeight; py += 1) {
@@ -156,12 +172,29 @@ export function cheapGlassMap(
         continue;
       }
 
-      // 边缘处权重 1，到 bezel 深度衰减到 0（对应原版那两个 smoothstep）
-      const falloff = 1 - smoothStep(0, bezel, -distance);
-      // 径向：朝中心收。这一项就是「边缘压缩感」的全部来源
-      const length = Math.hypot(ex, ey) || 1;
-      const offsetX = (-ex / length) * amount * falloff;
-      const offsetY = (-ey / length) * amount * falloff;
+      // u：距离「线性」映射到环带，0 在环带内界、1 在边缘。
+      // 不能再套 smoothstep——链式法则会把零斜率原样送回边缘，剖面就白换了
+      const u = 1 + distance / bezel;
+      if (u <= 0) continue; // 环带以内的玻璃中间：不偏移
+
+      // 圆弧剖面：t(0)=0、t(1)=1，斜率随 u 单调增大、在边缘处最大。
+      // smoothstep 那种两端导数为零的 S 形是「平切角」，这个才是「圆角」
+      const t = (u * arcNorm) / Math.sqrt(1 - ARC_SHARPNESS * u * u);
+
+      // 方向：SDF 的中心差分梯度 = 表面法线，恒指向「离边界更远」的外侧，
+      // 取负号让位移朝内——边缘把内部的像素「拉」过来，形成压缩感。
+      // 比径向朝中心收更物理：长边中段的法线垂直于边，径向会斜指向中心
+      const gx =
+        roundedRectSdf(ex + epsilon, ey, halfWidth, halfHeight, radius) -
+        roundedRectSdf(ex - epsilon, ey, halfWidth, halfHeight, radius);
+      const gy =
+        roundedRectSdf(ex, ey + epsilon, halfWidth, halfHeight, radius) -
+        roundedRectSdf(ex, ey - epsilon, halfWidth, halfHeight, radius);
+      const len = Math.hypot(gx, gy);
+      if (len < 1e-6) continue;
+
+      const offsetX = -(gx / len) * amount * t;
+      const offsetY = -(gy / len) * amount * t;
       rawX[index] = offsetX;
       rawY[index] = offsetY;
       maxDisplacement = Math.max(maxDisplacement, Math.abs(offsetX), Math.abs(offsetY));

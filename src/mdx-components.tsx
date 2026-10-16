@@ -1,5 +1,6 @@
 import type { MDXComponents } from "mdx/types";
 import { CodeBlock, type PreElementProps } from "@/components/code-block";
+import { InlineCode } from "@/components/inline-code";
 
 /**
  * 全局 MDX 组件映射。
@@ -24,6 +25,21 @@ const components: MDXComponents = {
         {children}
       </CodeBlock>
     );
+  },
+
+  /**
+   * 行内代码：点击即复制（InlineCode，客户端组件）。
+   *
+   * MDX 里所有 code 元素都会经过这个映射，包括代码块内部的那个 code——
+   * 区分依据是 rehype-pretty-code 的产物：块级 pre > code 一律带
+   * data-language 属性，行内裸 code 没有任何属性。带标记的原样放行，
+   * 交给 CodeBlock 的 pre 外壳；不带标记的才是行内代码，换成交互组件。
+   */
+  code: (props) => {
+    if (props["data-language"] !== undefined) {
+      return <code {...props} />;
+    }
+    return <InlineCode {...props} />;
   },
 
   /**

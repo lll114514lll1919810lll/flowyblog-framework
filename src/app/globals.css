@@ -2168,6 +2168,48 @@ html {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/* 行内代码点击复制（components/inline-code.tsx）：悬停提示可点，
+   复制成功后描边亮一档并弹出「已复制」气泡，1.2s 后自动消退。
+   气泡用前景/背景反色，两个主题下都不需要单独配色。 */
+.prose :not(pre) > code.inline-code-copy {
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.15s ease;
+}
+
+.prose :not(pre) > code.inline-code-copy:hover {
+  border-color: var(--accent);
+}
+
+.prose :not(pre) > code.inline-code-copy[data-copied] {
+  border-color: var(--accent);
+}
+
+.prose :not(pre) > code.inline-code-copy[data-copied]::after {
+  content: "已复制";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  animation: inline-code-pop 0.15s ease-out;
+}
+
+@keyframes inline-code-pop {
+  from {
+    opacity: 0;
+    translate: 0 2px;
+  }
+}
+
 .prose pre code {
   background: transparent;
   border: 0;
