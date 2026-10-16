@@ -5,8 +5,8 @@
 -- 本文件只用于升级**已有数据**的库。
 --
 -- 应用：
---   本地：npx wrangler d1 execute fbz-blog-comments --local  --file=db/migrations/0005-add-pinned.sql
---   线上：npx wrangler d1 execute fbz-blog-comments --remote --file=db/migrations/0005-add-pinned.sql
+--   本地：npx wrangler d1 execute fblog-comments --local  --file=db/migrations/0005-add-pinned.sql
+--   线上：npx wrangler d1 execute fblog-comments --remote --file=db/migrations/0005-add-pinned.sql
 
 -- 默认值 0（= 非置顶）：迁移前的评论本来就都在普通时间流里。
 ALTER TABLE comments ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;

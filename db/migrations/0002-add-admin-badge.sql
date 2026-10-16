@@ -5,8 +5,8 @@
 -- 已存在的表加列，所以必须单独 ALTER）。
 --
 -- 应用：
---   本地：npx wrangler d1 execute fbz-blog-comments --local  --file=db/migrations/0002-add-admin-badge.sql
---   线上：npx wrangler d1 execute fbz-blog-comments --remote --file=db/migrations/0002-add-admin-badge.sql
+--   本地：npx wrangler d1 execute fblog-comments --local  --file=db/migrations/0002-add-admin-badge.sql
+--   线上：npx wrangler d1 execute fblog-comments --remote --file=db/migrations/0002-add-admin-badge.sql
 
 -- 1 = 在该条昵称旁显示金色「管理员」徽标，0 = 不显示。
 --

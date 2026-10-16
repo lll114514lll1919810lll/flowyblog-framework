@@ -5,8 +5,8 @@
 -- 已存在的表加列，所以必须单独 ALTER）。
 --
 -- 应用：
---   本地：npx wrangler d1 execute fbz-blog-comments --local  --file=db/migrations/0001-add-parent-id.sql
---   线上：npx wrangler d1 execute fbz-blog-comments --remote --file=db/migrations/0001-add-parent-id.sql
+--   本地：npx wrangler d1 execute fblog-comments --local  --file=db/migrations/0001-add-parent-id.sql
+--   线上：npx wrangler d1 execute fblog-comments --remote --file=db/migrations/0001-add-parent-id.sql
 
 -- parent_id 为 NULL 表示顶层留言；非空表示所回复的顶层留言 id。
 -- 允许 NULL，所以已有数据不需要回填。

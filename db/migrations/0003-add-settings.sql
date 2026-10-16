@@ -4,8 +4,8 @@
 -- 本文件只用于升级**已有数据**的库。
 --
 -- 应用：
---   本地：npx wrangler d1 execute fbz-blog-comments --local  --file=db/migrations/0003-add-settings.sql
---   线上：npx wrangler d1 execute fbz-blog-comments --remote --file=db/migrations/0003-add-settings.sql
+--   本地：npx wrangler d1 execute fblog-comments --local  --file=db/migrations/0003-add-settings.sql
+--   线上：npx wrangler d1 execute fblog-comments --remote --file=db/migrations/0003-add-settings.sql
 
 -- 为什么用表而不是环境变量：
 -- 环境变量（Pages 的 Settings → Environment variables）改了要重新部署才生效，

@@ -5,8 +5,8 @@
 -- 本文件只用于升级**已有数据**的库。
 --
 -- 应用：
---   本地：npx wrangler d1 execute fbz-blog-comments --local  --file=db/migrations/0004-add-approved.sql
---   线上：npx wrangler d1 execute fbz-blog-comments --remote --file=db/migrations/0004-add-approved.sql
+--   本地：npx wrangler d1 execute fblog-comments --local  --file=db/migrations/0004-add-approved.sql
+--   线上：npx wrangler d1 execute fblog-comments --remote --file=db/migrations/0004-add-approved.sql
 
 -- 默认值 1（= 通过）：迁移前发表的评论本来就是可见的，必须原样保留。
 -- SQLite 允许 ADD COLUMN 带 NOT NULL DEFAULT（常量默认值会直接用于存量行）。

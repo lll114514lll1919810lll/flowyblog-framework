@@ -1,8 +1,8 @@
 -- 评论表。
 --
 -- 应用方式（二选一，按目标环境）：
---   本地：npx wrangler d1 execute fbz-blog-comments --local  --file=db/schema.sql
---   线上：npx wrangler d1 execute fbz-blog-comments --remote --file=db/schema.sql
+--   本地：npx wrangler d1 execute fblog-comments --local  --file=db/schema.sql
+--   线上：npx wrangler d1 execute fblog-comments --remote --file=db/schema.sql
 --
 -- 重复执行安全：全部 IF NOT EXISTS。
 --
