@@ -81,7 +81,10 @@ function toPlainText(source: string): string {
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // 链接 → 文字
     .replace(/`([^`]*)`/g, "$1") // 行内代码 → 去掉反引号
     .replace(/\*\*([^*]*)\*\*/g, "$1")
-    .replace(/[*_~]/g, "")
+    // 只删 * 和 ~（强调标记，slugger 也会当分隔符处理）。
+    // 保留 _：与 posts.ts 的 TOC 清洗一致，否则索引文本里的
+    // mask_denoise 会变成 maskdenoise，和原文对不上。
+    .replace(/[*~]/g, "")
     .replace(/^\s*\|.*\|\s*$/gm, (row) =>
       // 表格行：去掉竖线和分隔线，只留单元格文字
       row
@@ -145,7 +148,8 @@ export function buildSearchIndex(): SearchIndex {
           heading[2]
             .replace(/`([^`]*)`/g, "$1")
             .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-            .replace(/[*_~]/g, ""),
+            // 只删 * 和 ~；保留 _，保证章节锚点 id 与页面实际一致
+            .replace(/[*~]/g, ""),
         ).trim();
         current = { id: slugger.slug(title), heading: title, text: "" };
         continue;

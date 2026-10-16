@@ -172,10 +172,14 @@ export function getTableOfContents(slug: string): TocItem[] {
     const depth = match[1].length as 2 | 3;
     const text = stripMath(
       match[2]
-        // 去掉行内代码和链接语法，只留纯文本
+        // 去掉行内代码和链接语法，只留纯文本。
+        // 只删 * 和 ~：它们只是 Markdown 强调标记，github-slugger 本来就会
+        // 当分隔符处理，删不删结果一样。_ 绝不能删——slugger 和 rehype-slug
+        // 都会保留词中下划线（如 mask_denoise），删掉会让这里生成的锚点 id
+        // 与页面实际锚点 id 不一致，目录点击跳转失效。
         .replace(/`([^`]*)`/g, "$1")
         .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-        .replace(/[*_~]/g, ""),
+        .replace(/[*~]/g, ""),
     ).trim();
 
     if (text) items.push({ id: slugger.slug(text), text, depth });
