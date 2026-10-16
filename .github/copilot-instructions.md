@@ -43,7 +43,7 @@ The CI workflow in `.github/workflows/ci.yml` is the canonical quality gate. It 
 
 ## High-level architecture
 
-- `src/app/`: Next.js App Router pages (`/`, `/blog`, `/tags`, `/about`, `/lab`, `/search`, admin routes, static export routes)
+- `src/app/`: Next.js App Router pages (`/`, `/blog`, `/tags`, `/about`, `/settings`, `/search`, admin routes, static export routes)
 - `src/components/`: UI layer for navigation, blog cards, comments, reading progress, search UI, experimental lab panels, and other page chrome
 - `src/lib/`: core logic and shared configuration; this is where the project’s behavior and data shaping live
   - `site.ts`: single source of truth for site name, author, URL, repo links, nav items, and global content metadata

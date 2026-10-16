@@ -69,8 +69,8 @@ pnpm dev
 | `pnpm typegen` | 生成 Next.js 路由类型（`PageProps` / `LayoutProps`） |
 | `pnpm typecheck` | TypeScript 类型检查 |
 | `pnpm lint` | ESLint 检查 |
-| `pnpm test` | 检查文章目录锚点解析 |
-| `pnpm test:theme` | 检查主题相关 CSS |
+| `pnpm test` | 检查文章目录锚点解析（锚点一致性对比需要 `pnpm dev` 在跑，服务器不可用时该项自动跳过） |
+| `pnpm test:theme` | 检查主题切换（需要 dev server 和带 CDP 端口 9333 的浏览器，见脚本头注释） |
 | `pnpm test:server` | 在 Windows 上启动测试服务器（可加端口参数，如 `pnpm test:server 3001`） |
 | `pnpm preview:cf` | 用 wrangler 本地预览静态产物 + 评论接口 |
 
