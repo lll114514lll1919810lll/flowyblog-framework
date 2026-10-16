@@ -48,6 +48,14 @@ type Status = "loading" | "ready" | "unavailable" | "error";
 const MAX_TEXT = 500;
 const MAX_NAME = 24;
 
+/**
+ * 按 Unicode 码点计长度，与服务端 validateComment（functions/_lib/api.js）
+ * 的 Array.from(...).length 同一规则。直接用 .length 数的是 UTF-16 码元，
+ * emoji 会被算成 2——计数器虚高、输入框也会提前截断，和中英文混排的
+ * 用户直觉对不上。
+ */
+const textLength = (value: string) => Array.from(value).length;
+
 /** 顶层留言每页条数。回复不占页数——它们跟着自己的根留言走 */
 const COMMENTS_PER_PAGE = 10;
 /** 超过这个换行数（视觉上已经是一大块）的留言默认折叠，点「展开全文」看全部 */
@@ -665,7 +673,8 @@ export function Comments({ page }: { page: string }) {
 
         <div className="flex items-center justify-end gap-2">
           <span className="text-xs text-muted tabular-nums">
-            {replyText.length}/{MAX_TEXT}
+            {/* 按码点计数，与服务端 validateComment 同一规则（见 textLength） */}
+            {textLength(replyText)}/{MAX_TEXT}
           </span>
           <button
             type="submit"
@@ -712,7 +721,7 @@ export function Comments({ page }: { page: string }) {
               字号继承 .comment-item，随文章字号档位缩放 */}
           <p
             className={`mt-2 whitespace-pre-wrap break-words leading-relaxed text-secondary ${
-              isLong && !expanded ? "line-clamp-5" : ""
+              isLong && !expanded ? "line-clamp-6" : ""
             }`}
           >
             {c.text}
@@ -851,7 +860,7 @@ export function Comments({ page }: { page: string }) {
             </p>
             <div className="flex items-center gap-3">
               <span className="text-xs text-muted tabular-nums">
-                {text.length}/{MAX_TEXT}
+                {textLength(text)}/{MAX_TEXT}
               </span>
               <button type="submit" disabled={submitting} className="btn-pill">
                 {submitting ? "发送中…" : "发表"}

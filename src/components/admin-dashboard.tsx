@@ -47,6 +47,12 @@ const PAGE_SIZE = 10;
 /** 编辑内容时的字数上限，与访客发表表单（comments.tsx）保持一致 */
 const MAX_TEXT = 500;
 
+/**
+ * 按 Unicode 码点计长度，与后端 admin/comments.js 的 PATCH 校验
+ * （Array.from(text).length）同一规则，避免 emoji 被数成 2 个字符。
+ */
+const textLength = (value: string) => Array.from(value).length;
+
 export function AdminDashboard() {
   const router = useRouter();
 
@@ -324,7 +330,7 @@ export function AdminDashboard() {
    */
   async function saveText(id: number) {
     const text = editText.trim();
-    if (!text || Array.from(text).length > MAX_TEXT || editBusy) return;
+    if (!text || textLength(text) > MAX_TEXT || editBusy) return;
     setEditBusy(true);
     setError("");
 
@@ -537,10 +543,10 @@ export function AdminDashboard() {
                   />
                   <span
                     className={`self-end text-xs tabular-nums ${
-                      editText.length >= MAX_TEXT ? "text-red-600 dark:text-red-400" : "text-muted"
+                      textLength(editText) >= MAX_TEXT ? "text-red-600 dark:text-red-400" : "text-muted"
                     }`}
                   >
-                    {editText.length}/{MAX_TEXT}
+                    {textLength(editText)}/{MAX_TEXT}
                   </span>
                 </div>
               ) : (
@@ -557,7 +563,7 @@ export function AdminDashboard() {
                       disabled={
                         editBusy ||
                         !editText.trim() ||
-                        editText.length > MAX_TEXT
+                        textLength(editText) > MAX_TEXT
                       }
                       onClick={() => saveText(c.id)}
                       className="btn-pill"
